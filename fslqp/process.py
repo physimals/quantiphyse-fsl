@@ -33,7 +33,15 @@ class FslProcess(Process):
         output_data = options.pop("output-data", {})
         output_rois = options.pop("output-rois", {})
         
-        wsp = Workspace(self.ivm)
+        path = []
+        if "FSLDIR" in os.environ:
+            path.append(os.path.join(os.environ["FSLDIR"], "bin"))
+        if "FSLDEVDIR" in os.environ:
+            path.append(os.path.join(os.environ["FSLDEVDIR"], "bin"))
+        if "FSLOUTPUTTYPE" not in os.environ:
+            os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+
+        wsp = Workspace(self.ivm, path=path)
         wsp.run(prog, argline=argline, output_data=output_data, output_rois=output_rois)
         
         self.status = Process.SUCCEEDED
@@ -82,5 +90,5 @@ class BetProcess(FslProcess):
             output_rois["%s_bet_mask" % data_name] = output_mask
             argline += " -m"
 
-        FslProcess.run(self, {"prog" : "bet", "argline" : argline, 
+        FslProcess.run(self, {"prog" : "bet2", "argline" : argline, 
                               "output-data" : output_data, "output-rois" : output_rois})

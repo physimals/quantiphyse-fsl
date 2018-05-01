@@ -5,18 +5,9 @@ Copyright (c) 2016-2017 University of Oxford, Martin Craig
 
 from __future__ import division, unicode_literals, absolute_import, print_function
 
-import sys
-import os
-import time
-import traceback
-import re
-import tempfile
-import math
+from PySide import QtGui
 
-import numpy as np
-from PySide import QtCore, QtGui
-
-from quantiphyse.gui.widgets import QpWidget, OverlayCombo, RoiCombo, Citation, TitleWidget, NumericOption, ChoiceOption, OptionalName
+from quantiphyse.gui.widgets import QpWidget, RunBox, OverlayCombo, RoiCombo, Citation, TitleWidget, NumericOption, ChoiceOption, OptionalName
 from quantiphyse.gui.dialogs import TextViewerDialog, error_dialog, GridEditDialog
 from quantiphyse.utils import debug, warn
 from quantiphyse.utils.exceptions import QpException
@@ -69,12 +60,8 @@ class FslWidget(QpWidget):
         self.grid.setColumnStretch(2, 1)
         vbox.addLayout(self.grid)
 
-        hbox = QtGui.QHBoxLayout()
-        self.run_btn = QtGui.QPushButton("Run %s" % self.prog.upper())
-        self.run_btn.clicked.connect(self.run)
-        hbox.addWidget(self.run_btn)
-        hbox.addStretch()
-        vbox.addLayout(hbox)
+        self.run_box = RunBox(self.get_process, self.get_options)
+        vbox.addWidget(self.run_box)
 
         vbox.addStretch(1)
 
@@ -133,18 +120,18 @@ class FastWidget(FslWidget):
     def get_options(self):
         options = {
             "data" : self.data_combo.currentText(),
-            "nclass" : self.nclass.value(),
+            "class" : self.nclass.value(),
             "iter" : self.iter.value(),
             "lowpass" : self.lowpass.value(),
-            "type" : self.type.combo.currentText(),
-            "fhard" : self.fhard.value(),
+            "type" : self.type.combo.currentIndex()+1,
+            "fHard" : self.fhard.value(),
             "biasfield" : self.biasfield.isChecked(),
             "biascorr" : self.biascorr.isChecked(),
             "nobias" : self.nobias.isChecked(),
             "init" : self.init.value(),
             "mixel" : self.mixel.value(),
             "fixed" : self.fixed.value(),
-            "hyper" : self.hyper.value(),
+            "Hyper" : self.hyper.value(),
         }
         return options
 

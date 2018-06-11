@@ -69,7 +69,75 @@ class FlirtRegMethod(RegMethod):
         log, data, rois = ret
         qpdata = load(os.path.join(process.workdir, "flirt_out.nii.gz"))
         return qpdata.raw(), None, log
+      
+    @classmethod
+    def moco(cls, moco_data, moco_grid, ref, ref_grid, options, queue):
+        """
+        Motion correction
         
+        We use MCFLIRT to implement this
+        
+        :param moco_data: A single 4D Numpy array containing data to motion correct.
+        :param moco_grid: 4x4 array giving grid-to-world transformation for ``moco_data``. 
+                          World co-ordinates should be in mm.
+        :param ref: Either 3D Numpy array containing reference data, or integer giving 
+                    the volume index of ``moco_data`` to use
+        :param ref_grid: 4x4 array giving grid-to-world transformation for ref_data. 
+                         Ignored if ``ref`` is an integer.
+        :param options: Method options as dictionary
+        :param queue: Queue object which method may put progress information on to. Progress 
+                      should be given as a number between 0 and 1.
+        
+        :return Tuple of three items. 
+        
+                First, motion corrected data as a 4D Numpy array in the same space as ``moco_data``
+        
+                Second, if options contains ``output-transform : True``, sequence of transformations
+                found, one for each volume in ``reg_data``. Each is either an affine matrix transformation 
+                or a sequence of 3 warp images, the same shape as ``regdata`` If ``output-transform`` 
+                is not given, returns None instead.
+
+                Third, log information from the registration as a string.
+        """
+        if moco_data.ndim != 4:
+            raise QpException("Cannot motion correct 3D data")
+        
+        ivm = ImageVolumeManagement()
+        ivm.add_data(moco_data, name="moco_data", grid=DataGrid(moco_data.shape[:3], moco_grid))
+
+        cmdline = ""
+        for key in options.keys():
+            value = options.pop(key)
+            if value:
+                cmdline += "-%s %s " % (key, value)
+            else:
+                cmdline += "-%s " % key
+
+        process = FslProcess(ivm, multiproc=False)
+        process.add_data("moco_data")
+        cmdline += "-in moco_data -out mcflirt_out"
+        if isinstance(ref, int):
+            cmdline += " -refvol %i" % ref
+        else:
+            ivm.add_data(ref, name="ref_data", grid=DataGrid(ref.shape, ref_grid))
+            cmdline += " -reffile ref_data"
+            process.add_data("ref_data")
+        options = {
+            "cmd" : "mcflirt", 
+            "cmdline" : cmdline,
+        }
+
+        cmdline = process.get_cmdline(options)
+        worker_id, success, ret = _run_cmd(0, None, process.workdir, cmdline, {}, {})
+        if not success:
+            import traceback
+            traceback.print_exc(ret)
+            raise ret
+        log, data, rois = ret
+        print(log)
+        qpdata = load(os.path.join(process.workdir, "mcflirt_out.nii.gz"))
+        return qpdata.raw(), None, log
+  
     def interface(self):
         if self.options_layout is None:      
             vbox = QtGui.QVBoxLayout()

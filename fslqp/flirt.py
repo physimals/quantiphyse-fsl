@@ -241,5 +241,5 @@ class FlirtRegMethod(RegMethod):
         # if final_interp != 0: opts[self.final.itemData(final_interp)] = ""
 
         for key, value in opts.items():
-            debug(key, value)
+            self.debug(key, value)
         return opts

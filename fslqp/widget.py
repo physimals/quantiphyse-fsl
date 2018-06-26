@@ -9,7 +9,6 @@ from PySide import QtGui
 
 from quantiphyse.gui.widgets import QpWidget, RunBox, OverlayCombo, RoiCombo, Citation, TitleWidget, NumericOption, ChoiceOption, OptionalName
 from quantiphyse.gui.dialogs import TextViewerDialog, error_dialog, GridEditDialog
-from quantiphyse.utils import debug, warn
 from quantiphyse.utils.exceptions import QpException
 
 from .process import FslProcess, FastProcess, BetProcess

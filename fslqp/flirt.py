@@ -4,7 +4,7 @@ from PySide import QtGui
 
 from quantiphyse.data import DataGrid, ImageVolumeManagement, load
 from quantiphyse.gui.widgets import Citation
-from quantiphyse.utils import debug, get_plugins
+from quantiphyse.utils import get_plugins
 from quantiphyse.utils.cmdline import CommandProcess, _run_cmd
 from quantiphyse.utils.exceptions import QpException
 

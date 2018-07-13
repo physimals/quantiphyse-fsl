@@ -1,14 +1,18 @@
-import os
+"""
+Registration method using FSL FLIRT wrapper
 
+Copyright (c) 2013-2018 University of Oxford
+"""
 from PySide import QtGui
 
-from quantiphyse.data import DataGrid, ImageVolumeManagement, load
+import fsl.wrappers as fsl
+
+from quantiphyse.data import QpData
 from quantiphyse.gui.widgets import Citation
 from quantiphyse.utils import get_plugins
-from quantiphyse.utils.cmdline import CommandProcess, _run_cmd
 from quantiphyse.utils.exceptions import QpException
 
-from .process import FslProcess
+from .process import qpdata_to_fslimage, fslimage_to_qpdata
 
 CITE_TITLE = "Improved Optimisation for the Robust and Accurate Linear Registration and Motion Correction of Brain Images"
 CITE_AUTHOR = "Jenkinson, M., Bannister, P., Brady, J. M. and Smith, S. M."
@@ -17,8 +21,12 @@ CITE_JOURNAL = "NeuroImage, 17(2), 825-841, 2002"
 RegMethod = get_plugins("base-classes", class_name="RegMethod")[0]
 
 class FlirtRegMethod(RegMethod):
+    """
+    FLIRT/MCFLIRT registration method
+    """
+
     def __init__(self):
-        RegMethod.__init__(self, "flirt")
+        RegMethod.__init__(self, "FLIRT/MCFLIRT")
         self.options_layout = None
         self.cost_models = {"Mutual information" : "mutualinfo",
                             "Woods" : "woods",
@@ -28,69 +36,38 @@ class FlirtRegMethod(RegMethod):
                             "Least squares" : "leastsq"}
 
     @classmethod
-    def reg_3d(cls, reg_data, reg_grid, ref_data, ref_grid, options, queue):
+    def reg_3d(cls, reg_data, ref_data, options, queue):
         """
         Static function for performing 3D registration
 
-        Mess at the moment. No returning of transforms, clunky use of command process
-        should use mcflirt for moco...
-
-        When revising, need to bear in mind that we can NOT call any asynchronous 
-        multiprocessing here, because this function is called by multiprocessing as a
-        daemon, and can therefore not spawn child  processes (although Popen seems to
-        work fine)
+        FIXME not working need to resolve output data space and return xform
         """
-        ivm = ImageVolumeManagement()
-        reg_data = ivm.add_data(reg_data, name="reg", grid=DataGrid(reg_data.shape, reg_grid))
-        ref_data = ivm.add_data(ref_data, name="ref", grid=DataGrid(ref_data.shape, ref_grid))
-
-        cmdline = ""
-        for key in options.keys():
-            value = options.pop(key)
-            if value:
-                cmdline += "-%s %s " % (key, value)
-            else:
-                cmdline += "-%s " % key
-
-        cmdline += "-in reg -ref ref -out flirt_out"
-        options = {
-            "cmd" : "flirt", 
-            "cmdline" : cmdline,
-        }
-
-        process = FslProcess(ivm, multiproc=False)
-        process.add_data("reg")
-        process.add_data("ref")
-
-        cmdline = process.get_cmdline(options)
-        worker_id, success, ret = _run_cmd(0, None, process.workdir, cmdline, {}, {})
-        if not success:
-            raise ret
-        log, data, rois = ret
-        qpdata = load(os.path.join(process.workdir, "flirt_out.nii.gz"))
-        return qpdata.raw(), None, log
+        reg = qpdata_to_fslimage(reg_data)
+        ref = qpdata_to_fslimage(ref_data)
+        
+        flirt_output = fsl.flirt(reg, ref, out=fsl.LOAD, **options)
+        print(flirt_output)
+        qpdata = fslimage_to_qpdata(flirt_output["out"].data, reg_data.name)
+        
+        return qpdata, None, "flirt log"
       
     @classmethod
-    def moco(cls, moco_data, moco_grid, ref, ref_grid, options, queue):
+    def moco(cls, moco_data, ref, options, queue):
         """
         Motion correction
         
         We use MCFLIRT to implement this
         
-        :param moco_data: A single 4D Numpy array containing data to motion correct.
-        :param moco_grid: 4x4 array giving grid-to-world transformation for ``moco_data``. 
-                          World co-ordinates should be in mm.
-        :param ref: Either 3D Numpy array containing reference data, or integer giving 
+        :param moco_data: A single 4D QpData instance containing data to motion correct.
+        :param ref: Either 3D QpData containing reference data, or integer giving 
                     the volume index of ``moco_data`` to use
-        :param ref_grid: 4x4 array giving grid-to-world transformation for ref_data. 
-                         Ignored if ``ref`` is an integer.
         :param options: Method options as dictionary
         :param queue: Queue object which method may put progress information on to. Progress 
                       should be given as a number between 0 and 1.
         
         :return Tuple of three items. 
         
-                First, motion corrected data as a 4D Numpy array in the same space as ``moco_data``
+                First, motion corrected data as 4D QpData in the same space as ``moco_data``
         
                 Second, if options contains ``output-transform : True``, sequence of transformations
                 found, one for each volume in ``reg_data``. Each is either an affine matrix transformation 
@@ -101,42 +78,21 @@ class FlirtRegMethod(RegMethod):
         """
         if moco_data.ndim != 4:
             raise QpException("Cannot motion correct 3D data")
-        
-        ivm = ImageVolumeManagement()
-        ivm.add_data(moco_data, name="moco_data", grid=DataGrid(moco_data.shape[:3], moco_grid))
 
-        cmdline = ""
-        for key in options.keys():
-            value = options.pop(key)
-            if value:
-                cmdline += "-%s %s " % (key, value)
-            else:
-                cmdline += "-%s " % key
+        reg = qpdata_to_fslimage(moco_data)
 
-        process = FslProcess(ivm, multiproc=False)
-        process.add_data("moco_data")
-        cmdline += "-in moco_data -out mcflirt_out"
         if isinstance(ref, int):
-            cmdline += " -refvol %i" % ref
+            options["refvol"] = ref
+        elif isinstance(ref, QpData):
+            options["reffile"] = qpdata_to_fslimage(ref)
         else:
-            ivm.add_data(ref, name="ref_data", grid=DataGrid(ref.shape, ref_grid))
-            cmdline += " -reffile ref_data"
-            process.add_data("ref_data")
-        options = {
-            "cmd" : "mcflirt", 
-            "cmdline" : cmdline,
-        }
-
-        cmdline = process.get_cmdline(options)
-        worker_id, success, ret = _run_cmd(0, None, process.workdir, cmdline, {}, {})
-        if not success:
-            import traceback
-            traceback.print_exc(ret)
-            raise ret
-        log, data, rois = ret
-        print(log)
-        qpdata = load(os.path.join(process.workdir, "mcflirt_out.nii.gz"))
-        return qpdata.raw(), None, log
+            raise QpException("invalid reference object type: %s" % type(ref))
+            
+        mcflirt_output = fsl.mcflirt(reg, out=fsl.LOAD, **options)
+        print(mcflirt_output)
+        qpdata = fslimage_to_qpdata(mcflirt_output["out"], moco_data.name)
+        
+        return qpdata, None, "mcflirt log"
   
     def interface(self):
         if self.options_layout is None:      

@@ -94,10 +94,10 @@ class FastWidget(FslWidget):
     def init_ui(self):
         FslWidget.init_ui(self)
         
-        self.grid.addWidget(QtGui.QLabel("Input data"), 0, 0)
+        self.grid.addWidget(QtGui.QLabel("Structural image (brain extracted)"), 0, 0)
         self.data_combo = OverlayCombo(self.ivm)
         self.grid.addWidget(self.data_combo, 0, 1)
-        self.type = ChoiceOption("Image type", self.grid, 1, choices=["T1", "T2", "PD"])
+        self.type = ChoiceOption("Image type", self.grid, 1, choices=["T1 weighted", "T2 weighted", "Proton Density"])
         self.nclass = NumericOption("Number of tissue-type classes", self.grid, 2, intonly=True, minval=1, maxval=10, default=3)
         self.biasfield = QtGui.QCheckBox("Output estimated bias field")
         self.grid.addWidget(self.biasfield, 3, 0)

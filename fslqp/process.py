@@ -3,6 +3,8 @@ Processes for FSL tools
 
 These processes use the wrappers in the fslpy package
 
+FIXME: Is FSLDIR etc being set correctly or do we need to do something in FSL wrappers?
+
 Copyright (c) 2013-2018 University of Oxford
 """
 
@@ -221,6 +223,8 @@ class BetProcess(FslProcess):
             "fracintensity" : options.pop("thresh", 0.5),
             "seg" : "output-brain" in options,
             "mask" : "output-mask" in options,
+            "centre" : options.pop("centre", None),
+            "r" : options.pop("radius", None),
         }
         
         if cmd_args["seg"]:

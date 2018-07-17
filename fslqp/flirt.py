@@ -47,7 +47,7 @@ class FlirtRegMethod(RegMethod):
         
         flirt_output = fsl.flirt(reg, ref, out=fsl.LOAD, **options)
         print(flirt_output)
-        qpdata = fslimage_to_qpdata(flirt_output["out"].data, reg_data.name)
+        qpdata = fslimage_to_qpdata(flirt_output["out"], reg_data.name)
         
         return qpdata, None, "flirt log"
       

@@ -6,13 +6,15 @@ Copyright (c) 2016-2017 University of Oxford, Martin Craig
 
 from __future__ import division, unicode_literals, absolute_import, print_function
 
+import os
+
 from PySide import QtGui
 
 from quantiphyse.gui.options import OptionBox, NumericOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption
-from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation
+from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation, WarningBox
 from quantiphyse.utils.exceptions import QpException
 
-from .process import FslProcess, FastProcess, BetProcess
+from .process import FastProcess, BetProcess
 
 from ._version import __version__
 
@@ -34,6 +36,14 @@ CITATIONS = {
     ),
 }
 
+WARNING = """
+FSL installation could not be found
+
+FSL widgets require FSL to be installed 
+
+If you do have FSL, make sure the environment variable $FSLDIR is set correctly
+"""
+
 class FslWidget(QpWidget):
     """
     Widget providing interface to FSL program
@@ -45,19 +55,23 @@ class FslWidget(QpWidget):
     def init_ui(self):
         vbox = QtGui.QVBoxLayout()
         self.setLayout(vbox)
-
+        
         title = TitleWidget(self, help="fsl", subtitle="%s %s" % (self.description, __version__))
         vbox.addWidget(title)
-              
+            
         cite = Citation(*CITATIONS.get(self.prog, CITATIONS["fsl"]))
         vbox.addWidget(cite)
 
         self.options = OptionBox("%s options" % self.prog.upper())
         vbox.addWidget(self.options)
 
-        self.run_box = RunBox(self.get_process, self.get_options)
-        vbox.addWidget(self.run_box)
-
+        if "FSLDIR" not in os.environ and "FSLDEVDIR" not in os.environ:
+            vbox.addWidget(WarningBox(WARNING))
+            self.options.setVisible(False)
+        else:
+            self.run_box = RunBox(self.get_process, self.get_options)
+            vbox.addWidget(self.run_box)
+        
         vbox.addStretch(1)
         
     def batch_options(self):
@@ -66,10 +80,6 @@ class FslWidget(QpWidget):
     def get_options(self):
         return self.options.values()
 
-    def run(self):
-        process = self.get_process()
-        process.run(self.get_options())
-    
 class FastWidget(FslWidget):
     def __init__(self, **kwargs):
         FslWidget.__init__(self, prog="fast", description="FMRIB Automated Segmentation Tool", name="FAST", **kwargs)
@@ -110,7 +120,7 @@ class BetWidget(FslWidget):
         self.centre = self.options.add("Brain centre (raw co-ordinates)", PickPointOption(self.ivl), key="centre", checked=True)
 
     def _data_changed(self):
-        self.centre.set_grid(self.ivm.data[self.data.value()].grid)
+        self.centre.set_grid(self.ivm.data[self.data.value].grid)
 
     def get_process(self):
         return BetProcess(self.ivm)

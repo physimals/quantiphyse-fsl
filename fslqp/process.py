@@ -12,11 +12,11 @@ import os
 import re
 import traceback
 
-import fsl.wrappers as fsl
-from fsl.data.image import Image
-
 from quantiphyse.data import QpData, NumpyData, DataGrid
 from quantiphyse.processes import Process
+
+from .fsl import wrappers as fsl
+from .fsl.data.image import Image
 
 _LOAD = "Pickleable replacement for fsl.LOAD special value, hope nobody is daft enough to pass this string as a parameter value"
 

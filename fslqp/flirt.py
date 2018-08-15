@@ -5,13 +5,12 @@ Copyright (c) 2013-2018 University of Oxford
 """
 from PySide import QtGui
 
-import fsl.wrappers as fsl
-
 from quantiphyse.data import QpData
 from quantiphyse.gui.widgets import Citation
 from quantiphyse.utils import get_plugins
 from quantiphyse.utils.exceptions import QpException
 
+from .fsl import wrappers as fsl
 from .process import qpdata_to_fslimage, fslimage_to_qpdata
 
 CITE_TITLE = "Improved Optimisation for the Robust and Accurate Linear Registration and Motion Correction of Brain Images"

@@ -34,14 +34,12 @@ def build_plugin(package_name, rootdir, distdir, platform):
 
     packagedir = os.path.join(distdir, package_name)
     shutil.copytree(os.path.join(rootdir, package_name), packagedir)
-    
-    # Copy ASL python libraries
-    aslmoddir = os.path.join(packagedir, "asl")
-    os.makedirs(aslmoddir)
-    for m in ["__init__.py", "fslhelpers.py"]:
-        modpath = os.path.join(fsldir, "python", "asl", m)
-        print("%s -> %s" % (modpath, aslmoddir))
-        shutil.copy(modpath, aslmoddir)
+
+    # Copy Python dependencies
+    fslmoddir = os.path.join(packagedir, "fsl")
+    import fsl 
+    fslmod_src = os.path.abspath(os.path.dirname(fsl.__file__))
+    shutil.copytree(fslmod_src, fslmoddir)
 
 pkgdir = os.path.abspath(os.path.dirname(__file__))
 rootdir = os.path.abspath(os.path.join(pkgdir, os.pardir))

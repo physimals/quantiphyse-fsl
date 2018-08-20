@@ -15,13 +15,11 @@ import traceback
 from quantiphyse.data import QpData, NumpyData, DataGrid
 from quantiphyse.processes import Process
 
-from .fsl import wrappers as fsl
-from .fsl.data.image import Image
-
-_LOAD = "Pickleable replacement for fsl.LOAD special value, hope nobody is daft enough to pass this string as a parameter value"
+_LOAD = "Pickleable replacement for fsl.wrappers.LOAD special value, hope nobody is daft enough to pass this string as a parameter value"
 
 def qpdata_to_fslimage(qpd):
     """ Convert QpData to fsl.data.Image"""
+    from fsl.data.image import Image
     return Image(qpd.raw(), name=qpd.name, xform=qpd.grid.affine)
 
 def fslimage_to_qpdata(img, name=None):
@@ -57,16 +55,18 @@ def _run_fsl(worker_id, queue, cmd, cmd_args):
     parameter. Also, the special fsl.LOAD object is not pickleable either
     so we pass our own special LOAD object (which is just a magic string).
     """
+    from fsl.data.image import Image
+    import fsl.wrappers as fslwrap
     try:
         # Get the FSL wrapper function from the name of the command
-        cmd_fn = getattr(fsl, cmd)
+        cmd_fn = getattr(fslwrap, cmd)
 
         for key in cmd_args.keys():
             val = cmd_args[key]
             if isinstance(val, QpData):
                 cmd_args[key] = qpdata_to_fslimage(val)
             elif val == _LOAD:
-                cmd_args[key] = fsl.LOAD
+                cmd_args[key] = fslwrap.LOAD
 
         progress_watcher = FslOutputProgress(queue)
         cmd_result = cmd_fn(log={"stdout" : progress_watcher, "cmd" : progress_watcher}, **cmd_args)

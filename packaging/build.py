@@ -27,8 +27,6 @@ def update_version(name, rootdir):
     return full_version, std_version
 
 def build_plugin(package_name, rootdir, distdir, platform):
-    fsldir = os.environ.get("FSLDEVDIR", os.environ.get("FSLDIR", ""))
-    print("Coping ASL modules from %s" % fsldir)
     print("Root dir is %s" % rootdir)
     os.makedirs(distdir)
 
@@ -36,7 +34,7 @@ def build_plugin(package_name, rootdir, distdir, platform):
     shutil.copytree(os.path.join(rootdir, package_name), packagedir)
 
     # Copy Python dependencies
-    fslmoddir = os.path.join(packagedir, "fsl")
+    fslmoddir = os.path.join(packagedir, "deps", "fsl")
     import fsl 
     fslmod_src = os.path.abspath(os.path.dirname(fsl.__file__))
     shutil.copytree(fslmod_src, fslmoddir)

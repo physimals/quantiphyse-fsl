@@ -10,7 +10,6 @@ from quantiphyse.gui.widgets import Citation
 from quantiphyse.utils import get_plugins
 from quantiphyse.utils.exceptions import QpException
 
-from .fsl import wrappers as fsl
 from .process import qpdata_to_fslimage, fslimage_to_qpdata
 
 CITE_TITLE = "Improved Optimisation for the Robust and Accurate Linear Registration and Motion Correction of Brain Images"
@@ -41,6 +40,7 @@ class FlirtRegMethod(RegMethod):
 
         FIXME not working need to resolve output data space and return xform
         """
+        from fsl import wrappers as fsl
         reg = qpdata_to_fslimage(reg_data)
         ref = qpdata_to_fslimage(ref_data)
         
@@ -75,6 +75,7 @@ class FlirtRegMethod(RegMethod):
 
                 Third, log information from the registration as a string.
         """
+        from fsl import wrappers as fsl
         if moco_data.ndim != 4:
             raise QpException("Cannot motion correct 3D data")
 

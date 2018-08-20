@@ -11,5 +11,6 @@ from .flirt import FlirtRegMethod
 QP_MANIFEST = {
     "widgets" : [FastWidget, BetWidget],
     "processes" : [FslProcess, FastProcess, BetProcess],
-    "reg-methods" : [FlirtRegMethod]
+    "reg-methods" : [FlirtRegMethod],
+    "module-dirs" : ["deps",],
 }

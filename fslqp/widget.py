@@ -120,7 +120,8 @@ class BetWidget(FslWidget):
         self.centre = self.options.add("Brain centre (raw co-ordinates)", PickPointOption(self.ivl), key="centre", checked=True)
 
     def _data_changed(self):
-        self.centre.setGrid(self.ivm.data[self.data.value].grid)
+        if self.options.values()["data"] in self.ivm.data:
+            self.centre.setGrid(self.ivm.data[self.options.values()["data"]].grid)
 
     def get_process(self):
         return BetProcess(self.ivm)

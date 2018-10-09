@@ -10,11 +10,10 @@ import os
 
 from PySide import QtGui
 
-from quantiphyse.gui.options import OptionBox, NumericOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption
+from quantiphyse.gui.options import OptionBox, NumericOption, TextOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption
 from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation, WarningBox
-from quantiphyse.utils.exceptions import QpException
 
-from .process import FastProcess, BetProcess
+from .process import FastProcess, BetProcess, FslAnatProcess, FslMathsProcess
 
 from ._version import __version__
 
@@ -52,27 +51,27 @@ class FslWidget(QpWidget):
         QpWidget.__init__(self, icon="fsl.png", group="FSL", **kwargs)
         self.prog = kwargs["prog"]
         
-    def init_ui(self):
-        vbox = QtGui.QVBoxLayout()
-        self.setLayout(vbox)
+    def init_ui(self, run_box=True):
+        self.vbox = QtGui.QVBoxLayout()
+        self.setLayout(self.vbox)
         
         title = TitleWidget(self, help="fsl", subtitle="%s %s" % (self.description, __version__))
-        vbox.addWidget(title)
+        self.vbox.addWidget(title)
             
         cite = Citation(*CITATIONS.get(self.prog, CITATIONS["fsl"]))
-        vbox.addWidget(cite)
+        self.vbox.addWidget(cite)
 
         self.options = OptionBox("%s options" % self.prog.upper())
-        vbox.addWidget(self.options)
+        self.vbox.addWidget(self.options)
 
         if "FSLDIR" not in os.environ and "FSLDEVDIR" not in os.environ:
-            vbox.addWidget(WarningBox(WARNING))
+            self.vbox.addWidget(WarningBox(WARNING))
             self.options.setVisible(False)
-        else:
+        elif run_box:
             self.run_box = RunBox(self.get_process, self.get_options)
-            vbox.addWidget(self.run_box)
+            self.vbox.addWidget(self.run_box)
         
-        vbox.addStretch(1)
+        self.vbox.addStretch(1)
         
     def batch_options(self):
         return self.get_process().PROCESS_NAME, self.get_options()
@@ -125,3 +124,46 @@ class BetWidget(FslWidget):
 
     def get_process(self):
         return BetProcess(self.ivm)
+
+class FslAnatWidget(FslWidget):
+    def __init__(self, **kwargs):
+        FslWidget.__init__(self, prog="fsl_anat", description="Anatomical segmentation from structural image", name="FSL_ANAT", **kwargs)
+    
+    def init_ui(self):
+        FslWidget.init_ui(self)
+        
+        self.options.add("Input structural data", DataOption(self.ivm), key="data")
+        self.options.add("Image type", ChoiceOption(["T1 weighted", "T2 weighted", "Proton Density"], return_values=["T1", "T2", "PD"]), key="img_type")
+        self.options.add("Strong bias field", BoolOption(), key="strongbias")
+        self.options.add("Re-orientation to standard space", BoolOption(invert=True), key="noreorient")
+        self.options.add("Automatic cropping", BoolOption(invert=True), key="nocrop")
+        self.options.add("Bias field correction", BoolOption(invert=True), key="nobias")
+        #self.options.add("Registration to standard space", BoolOption(invert=True), key="noreg")
+        #self.options.add("Non-linear registration", BoolOption(invert=True), key="nononlinreg")
+        self.options.add("Segmentation", BoolOption(invert=True), key="noseg")
+        self.options.add("Sub-cortical segmentation", BoolOption(invert=True), key="nosubcortseg")
+        self.options.add("BET Intensity threshold", NumericOption(minval=0, maxval=1, default=0.5), key="betfparam")
+        self.options.add("Bias field smoothing extent (mm)", NumericOption(minval=0, maxval=100, default=20), key="bias_smoothing")
+
+    def get_process(self):
+        return FslAnatProcess(self.ivm)
+
+class FslMathsWidget(FslWidget):
+    def __init__(self, **kwargs):
+        FslWidget.__init__(self, prog="fslmaths", description="Miscellaneous data processing", name="FSL Maths", **kwargs)
+    
+    def init_ui(self):
+        FslWidget.init_ui(self, run_box=False)
+        run_btn = QtGui.QPushButton("Run")
+        run_btn.clicked.connect(self._run)
+        self.options.add("Command string", TextOption(), run_btn, key="cmd")
+
+        doc = QtGui.QLabel("Enter the fslmaths command line string as you would normally. Use the names of the Quantiphyse data sets you want to use as filenames")
+        doc.setWordWrap(True)
+        self.vbox.insertWidget(self.vbox.count()-1, doc)
+
+    def _run(self):
+        self.get_process().run(self.get_options())
+
+    def get_process(self):
+        return FslMathsProcess(self.ivm)

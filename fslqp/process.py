@@ -14,6 +14,8 @@ import traceback
 
 from quantiphyse.data import QpData, NumpyData, DataGrid
 from quantiphyse.processes import Process
+from quantiphyse.utils import QpException
+from quantiphyse.utils.cmdline import OutputStreamMonitor
 
 _LOAD = "Pickleable replacement for fsl.wrappers.LOAD special value, hope nobody is daft enough to pass this string as a parameter value"
 
@@ -26,24 +28,6 @@ def fslimage_to_qpdata(img, name=None):
     """ Convert fsl.data.Image to QpData """
     if not name: name = img.name
     return NumpyData(img.data, grid=DataGrid(img.shape[:3], img.voxToWorldMat), name=name)
-
-class FslOutputProgress(object):
-    """
-    Simple file-like object which listens to the output
-    of an FSL command and sends each line to a Queue
-    """
-    def __init__(self, queue):
-        self._queue = queue
-
-    def write(self, text):
-        """ Handle output from the process - send each line to the queue """
-        lines = text.splitlines()
-        for line in lines:
-            self._queue.put(line)
-
-    def flush(self):
-        """ Ignore flush requests """
-        pass
 
 def _run_fsl(worker_id, queue, cmd, cmd_args):
     """
@@ -68,7 +52,7 @@ def _run_fsl(worker_id, queue, cmd, cmd_args):
             elif val == _LOAD:
                 cmd_args[key] = fslwrap.LOAD
 
-        progress_watcher = FslOutputProgress(queue)
+        progress_watcher = OutputStreamMonitor(queue)
         cmd_result = cmd_fn(log={"stdout" : progress_watcher, "cmd" : progress_watcher}, **cmd_args)
 
         ret = {}
@@ -104,7 +88,6 @@ class FslProcess(Process):
         """
         # Reset expected output - this can be updated in init_cmd
         self._output_data = {}
-        self._output_rois = {}
         self._expected_steps = []
         self._current_step = 0
         self._current_data = None
@@ -138,15 +121,11 @@ class FslProcess(Process):
             self.debug(cmd_result)
 
             self.debug(self._output_data)
-            self.debug(self._output_rois)
             for key, qpdata in cmd_result.items():
                 self.debug("Looking for mapping for result labelled %s", key)
                 if key in self._output_data:
                     self.debug("Found in data: %s", self._output_data[key])
-                    self.ivm.add_data(qpdata, name=self._output_data[key])
-                if key in self._output_rois:
-                    self.debug("Found in rois: %s", self._output_rois[key])
-                    self.ivm.add_roi(qpdata, name=self._output_rois[key])
+                    self.ivm.add(qpdata, name=self._output_data[key])
 
             if self._current_data:
                 self.ivm.set_current_data(self._current_data)
@@ -186,14 +165,14 @@ class FastProcess(FslProcess):
             self._current_data = "%s_pve_0" % data.name
         
         if options.pop("output-pveseg", True):
-            self._output_rois["out_pveseg"] = "%s_pveseg" % data.name
-            self._current_roi = self._output_rois["out_pveseg"]
+            self._output_data["out_pveseg"] = "%s_pveseg" % data.name
+            self._current_roi = self._output_data["out_pveseg"]
 
         if options.pop("output-rawseg", False):
-            self._output_rois["out_seg"] = "%s_seg" % data.name 
+            self._output_data["out_seg"] = "%s_seg" % data.name 
 
         if options.pop("output-mixeltype", False):
-            self._output_rois["out_mixeltype"] = "%s_mixeltype" % data.name
+            self._output_data["out_mixeltype"] = "%s_mixeltype" % data.name
 
         if options.pop("biasfield", False):
             options["b"] = True
@@ -231,7 +210,123 @@ class BetProcess(FslProcess):
             self._output_data["output"] = options.pop("output-brain")
             self._current_data = self._output_data["output"]
         if cmd_args["mask"]:
-            self._output_rois["output_mask"] = options.pop("output-mask")
-            self._current_roi = self._output_rois["output_mask"]
+            self._output_data["output_mask"] = options.pop("output-mask")
+            self._current_roi = self._output_data["output_mask"]
 
         return "bet", cmd_args
+
+class FslAnatProcess(FslProcess):
+    """
+    FslProcess for the 'FSL_ANAT' tool
+    """
+    PROCESS_NAME = "FslAnat"
+
+    def init_cmd(self, options):
+        data = self.get_data(options)
+        
+        cmd_args = {
+            "img" : data,
+            "out" : _LOAD,
+        }
+        cmd_args.update(options)
+
+        self._output_data = {
+            #'out.anat/MNI_to_T1_nonlin_field' : '',
+            #'out.anat/MNI152_T1_2mm_brain_mask_dil1' : '',
+            #'out.anat/T1_to_MNI_lin' : '',
+            #'out.anat/T1_to_MNI_nonlin' : '',
+            #'out.anat/T1_to_MNI_nonlin_jac' : '',
+            #'out.anat/T1_to_MNI_nonlin_field' : '',
+            #'out.anat/T1_to_MNI_nonlin_coeff' : '',
+            #'out.anat/lesionmask' : '',
+            #'out.anat/lesionmaskinv' : '',
+        }
+        if not options.get("nosubcortseg", False):
+            self._output_data.update({
+                'out.anat/T1' : data.name + '_crop',
+                #'out.anat/T1_fullfov' : '',
+            })
+
+        if not options.get("nobias", False):
+            self._output_data.update({
+                'out.anat/T1_biascorr' : data.name + '_biascorr',
+                'out.anat/T1_biascorr_brain' : data.name + '_brain',
+                'out.anat/T1_biascorr_brain_mask' : data.name + '_brain_mask',
+                #'out.anat/T1_biascorr_bet_skull' : data.name + '_skull,
+                'out.anat/T1_fast_bias' : data.name + '_bias',
+            })
+
+        if not options.get("noseg", False):
+            self._output_data.update({
+                'out.anat/T1_fast_seg' : data.name + '_seg',
+                'out.anat/T1_fast_pveseg' : data.name + '_pveseg',
+                'out.anat/T1_fast_pve_0' : data.name + '_pve_0',
+                'out.anat/T1_fast_pve_1' : data.name + '_pve_1',
+                'out.anat/T1_fast_pve_2' : data.name + '_pve_2',
+                'out.anat/T1_fast_mixeltype' : data.name + '_mixeltype',
+                #'out.anat/T1_fast_restore' : '',
+            })
+
+        if not options.get("nosubcortseg", False):
+            self._output_data.update({
+                'out.anat/T1_subcort_seg': data.name + '_subcort_seg',
+                #'out.anat/first_results/T1_first_all_fast_firstseg' : '',
+                #'out.anat/first_results/T1_first_all_fast_origsegs': '',
+            })
+
+        #    self._current_data = self._output_data["output"]
+        #    self._current_roi = self._output_data["output_mask"]
+
+        self._expected_steps = ["Single Image Segmentation", "tissue-type segmentation"]
+
+        return "fsl_anat", cmd_args
+
+class FslMathsProcess(Process):
+    """
+    FslProcess for the 'FSL_ANAT' tool
+    """
+    PROCESS_NAME = "FslMaths"
+
+    def run(self, options):
+        from fsl.wrappers import fslmaths
+        
+        cmds = options.pop("cmd", "").split()
+        if cmds[0] == "fslmaths":
+            del cmds[0]
+
+        input_data = cmds[0]
+        output_data = cmds[-1]
+        if input_data not in self.ivm.data:
+            raise QpException("Input data not found: %s" % input_data)
+        
+        cmds = cmds[1:-1]
+        img = qpdata_to_fslimage(self.ivm.data[input_data])
+        proc = fslmaths(img)
+        current_method = None
+        current_args = []
+        for cmd in cmds:
+            if cmd[0] == "-":
+                if current_method is not None:
+                    self.debug("Executing %s(%s)", current_method, current_args)
+                    proc = current_method(*current_args)
+                elif current_args:
+                    self.warn("Discarding args: %s", current_args)
+                cmd = cmd.lstrip("-")
+                try:
+                    current_method = getattr(proc, cmd)
+                except AttributeError:
+                    self.warn("No such command")
+                    current_method = None
+                current_args = []
+            else:
+                if cmd in self.ivm.data:
+                    current_args.append(qpdata_to_fslimage(self.ivm.data[cmd]))
+                else:
+                    current_args.append(cmd)
+
+        if current_method is not None:
+            self.debug("Executing %s(%s)", current_method, current_args)
+            proc = current_method(*current_args)
+        ret = proc.run()
+        print(ret)
+        self.ivm.add(fslimage_to_qpdata(ret), name=output_data)

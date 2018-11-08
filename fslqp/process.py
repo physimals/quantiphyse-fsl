@@ -110,14 +110,14 @@ class FslProcess(Process):
         """
         return options.pop("cmd"), options.pop("cmd-args", {})
 
-    def finished(self):
+    def finished(self, worker_output):
         """
         Add expected output to the IVM and set current data/roi
         """
         self.debug("finished: %i", self.status)
         if self.status == Process.SUCCEEDED:
 
-            cmd_result = self.worker_output[0]
+            cmd_result = worker_output[0]
             self.debug(cmd_result)
 
             self.debug(self._output_data)
@@ -133,14 +133,14 @@ class FslProcess(Process):
             if self._current_roi:
                 self.ivm.set_current_roi(self._current_roi)
             
-    def timeout(self):
+    def timeout(self, queue):
         """
         Check the command output on the queue and if it matches
         an expected step, send sig_progress
         """
-        if self.queue.empty(): return
-        while not self.queue.empty():
-            line = self.queue.get()
+        if queue.empty(): return
+        while not queue.empty():
+            line = queue.get()
             self.debug(line)
             if self._current_step < len(self._expected_steps):
                 expected = self._expected_steps[self._current_step]

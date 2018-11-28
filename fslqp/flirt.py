@@ -1,16 +1,17 @@
 """
-Registration method using FSL FLIRT wrapper
+Quantiphyse - Registration method using FSL FLIRT/MCFLIRT wrappers
 
 Copyright (c) 2013-2018 University of Oxford
 """
 from PySide import QtGui
 
-from quantiphyse.data import QpData
+from quantiphyse.data import QpData, DataGrid, NumpyData
 from quantiphyse.gui.widgets import Citation
 from quantiphyse.utils import get_plugins
 from quantiphyse.utils.exceptions import QpException
 
 from .process import qpdata_to_fslimage, fslimage_to_qpdata
+from .flirt_transform import FlirtTransform
 
 CITE_TITLE = "Improved Optimisation for the Robust and Accurate Linear Registration and Motion Correction of Brain Images"
 CITE_AUTHOR = "Jenkinson, M., Bannister, P., Brady, J. M. and Smith, S. M."
@@ -38,17 +39,28 @@ class FlirtRegMethod(RegMethod):
         """
         Static function for performing 3D registration
 
-        FIXME not working need to resolve output data space and return xform
+        FIXME need to resolve output data space and return xform
         """
+        import sys
         from fsl import wrappers as fsl
         reg = qpdata_to_fslimage(reg_data)
         ref = qpdata_to_fslimage(ref_data)
         
-        flirt_output = fsl.flirt(reg, ref, out=fsl.LOAD, **options)
-        print(flirt_output)
-        qpdata = fslimage_to_qpdata(flirt_output["out"], reg_data.name)
-        
-        return qpdata, None, "flirt log"
+        output_space = options.pop("output-space", "ref")
+        flirt_output = fsl.flirt(reg, ref, out=fsl.LOAD, omat=fsl.LOAD, log={"cmd" : sys.stdout}, **options)
+        transform = FlirtTransform(reg_data.grid, ref_data.grid, flirt_output["omat"])
+
+        if output_space == "ref":
+            qpdata = fslimage_to_qpdata(flirt_output["out"], reg_data.name)
+        elif output_space == "reg":
+            qpdata = fslimage_to_qpdata(flirt_output["out"], reg_data.name).resample(reg_data.grid)
+            qpdata.name = reg_data.name
+        elif output_space == "trans":
+            trans_affine = transform.voxel_to_world(reg_data.grid)
+            trans_grid = DataGrid(reg_data.grid.shape, trans_affine)
+            qpdata = NumpyData(reg_data.raw(), grid=trans_grid, name=reg_data.name)
+            
+        return qpdata, transform, "flirt log"
       
     @classmethod
     def moco(cls, moco_data, ref, options, queue):
@@ -197,5 +209,8 @@ class FlirtRegMethod(RegMethod):
         # if final_interp != 0: opts[self.final.itemData(final_interp)] = ""
 
         for key, value in opts.items():
-            self.debug(key, value)
+            self.debug("%s: %s", key, value)
         return opts
+
+    def transform_type(self):
+        return FlirtTransform

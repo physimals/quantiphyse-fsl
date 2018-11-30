@@ -88,6 +88,7 @@ class FslProcess(Process):
         """
         # Reset expected output - this can be updated in init_cmd
         self._output_data = {}
+        self._output_rois = {}
         self._expected_steps = []
         self._current_step = 0
         self._current_data = None
@@ -125,7 +126,12 @@ class FslProcess(Process):
                 self.debug("Looking for mapping for result labelled %s", key)
                 if key in self._output_data:
                     self.debug("Found in data: %s", self._output_data[key])
+                    qpdata.roi = False
                     self.ivm.add(qpdata, name=self._output_data[key])
+                if key in self._output_rois:
+                    self.debug("Found in ROIs: %s", self._output_rois[key])
+                    qpdata.roi = True
+                    self.ivm.add(qpdata, name=self._output_rois[key])
 
             if self._current_data:
                 self.ivm.set_current_data(self._current_data)
@@ -165,14 +171,14 @@ class FastProcess(FslProcess):
             self._current_data = "%s_pve_0" % data.name
         
         if options.pop("output-pveseg", True):
-            self._output_data["out_pveseg"] = "%s_pveseg" % data.name
-            self._current_roi = self._output_data["out_pveseg"]
+            self._output_rois["out_pveseg"] = "%s_pveseg" % data.name
+            self._current_roi = self._output_rois["out_pveseg"]
 
         if options.pop("output-rawseg", False):
-            self._output_data["out_seg"] = "%s_seg" % data.name 
+            self._output_rois["out_seg"] = "%s_seg" % data.name 
 
         if options.pop("output-mixeltype", False):
-            self._output_data["out_mixeltype"] = "%s_mixeltype" % data.name
+            self._output_rois["out_mixeltype"] = "%s_mixeltype" % data.name
 
         if options.pop("biasfield", False):
             options["b"] = True
@@ -210,8 +216,8 @@ class BetProcess(FslProcess):
             self._output_data["output"] = options.pop("output-brain")
             self._current_data = self._output_data["output"]
         if cmd_args["mask"]:
-            self._output_data["output_mask"] = options.pop("output-mask")
-            self._current_roi = self._output_data["output_mask"]
+            self._output_rois["output_mask"] = options.pop("output-mask")
+            self._current_roi = self._output_rois["output_mask"]
 
         return "bet", cmd_args
 
@@ -258,24 +264,23 @@ class FslAnatProcess(FslProcess):
 
         if not options.get("noseg", False):
             self._output_data.update({
-                'out.anat/T1_fast_seg' : data.name + '_seg',
-                'out.anat/T1_fast_pveseg' : data.name + '_pveseg',
                 'out.anat/T1_fast_pve_0' : data.name + '_pve_0',
                 'out.anat/T1_fast_pve_1' : data.name + '_pve_1',
                 'out.anat/T1_fast_pve_2' : data.name + '_pve_2',
-                'out.anat/T1_fast_mixeltype' : data.name + '_mixeltype',
                 #'out.anat/T1_fast_restore' : '',
+            })
+            self._output_rois.update({
+                'out.anat/T1_fast_seg' : data.name + '_seg',
+                'out.anat/T1_fast_pveseg' : data.name + '_pveseg',
+                'out.anat/T1_fast_mixeltype' : data.name + '_mixeltype',
             })
 
         if not options.get("nosubcortseg", False):
-            self._output_data.update({
+            self._output_rois.update({
                 'out.anat/T1_subcort_seg': data.name + '_subcort_seg',
                 #'out.anat/first_results/T1_first_all_fast_firstseg' : '',
                 #'out.anat/first_results/T1_first_all_fast_origsegs': '',
             })
-
-        #    self._current_data = self._output_data["output"]
-        #    self._current_roi = self._output_data["output_mask"]
 
         self._expected_steps = ["Single Image Segmentation", "tissue-type segmentation"]
 

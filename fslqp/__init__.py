@@ -7,10 +7,12 @@ Copyright (c) 2016-2017 University of Oxford, Martin Craig
 from .widget import FastWidget, BetWidget, FslAnatWidget, FslMathsWidget
 from .process import FslProcess, FastProcess, BetProcess
 from .flirt import FlirtRegMethod
+from .fnirt import FnirtRegMethod
+
 
 QP_MANIFEST = {
     "widgets" : [FastWidget, BetWidget, FslAnatWidget, FslMathsWidget],
     "processes" : [FslProcess, FastProcess, BetProcess],
-    "reg-methods" : [FlirtRegMethod],
+    "reg-methods" : [FlirtRegMethod, FnirtRegMethod],
     "module-dirs" : ["deps",],
 }

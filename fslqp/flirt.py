@@ -3,10 +3,12 @@ Quantiphyse - Registration method using FSL FLIRT/MCFLIRT wrappers
 
 Copyright (c) 2013-2018 University of Oxford
 """
+import six
 from PySide import QtGui
 
 from quantiphyse.data import QpData, DataGrid, NumpyData
 from quantiphyse.gui.widgets import Citation
+from quantiphyse.gui.options import OptionBox, ChoiceOption, NumericOption
 from quantiphyse.utils import get_plugins
 from quantiphyse.utils.exceptions import QpException
 
@@ -25,8 +27,8 @@ class FlirtRegMethod(RegMethod):
     """
 
     def __init__(self):
-        RegMethod.__init__(self, "FLIRT/MCFLIRT")
-        self.options_layout = None
+        RegMethod.__init__(self, "flirt", "FLIRT/MCFLIRT")
+        self.options_widget = None
         self.cost_models = {"Mutual information" : "mutualinfo",
                             "Woods" : "woods",
                             "Correlation ratio" : "corratio",
@@ -35,32 +37,58 @@ class FlirtRegMethod(RegMethod):
                             "Least squares" : "leastsq"}
 
     @classmethod
+    def apply_transform(cls, reg_data, transform, options, queue):
+        """
+        Apply a previously calculated transformation to a data set
+
+        We are not actually using FSL applyxfm for this although it would be
+        an alternative option for the reference space output option. Instead
+        we perform a non-lossy affine transformation and then resample onto
+        the reference or registration spaces as required.
+        """
+        log = "Performing non-lossy affine transformation\n"
+        affine = transform.voxel_to_world(reg_data.grid)
+        grid = DataGrid(reg_data.grid.shape, affine)
+        qpdata = NumpyData(reg_data.raw(), grid=grid, name=reg_data.name)
+        
+        output_space = options.pop("output-space", "ref")
+        if output_space == "ref":
+            qpdata = qpdata.resample(transform.ref_grid, suffix="")
+            log += "Resampling onto reference grid\n"
+        elif output_space == "reg":
+            qpdata = qpdata.resample(transform.reg_grid, suffix="")
+            log += "Resampling onto reference grid\n"
+            
+        print(qpdata.name)
+        return qpdata, log
+
+    @classmethod
     def reg_3d(cls, reg_data, ref_data, options, queue):
         """
         Static function for performing 3D registration
 
         FIXME need to resolve output data space and return xform
         """
-        import sys
         from fsl import wrappers as fsl
         reg = qpdata_to_fslimage(reg_data)
         ref = qpdata_to_fslimage(ref_data)
         
         output_space = options.pop("output-space", "ref")
-        flirt_output = fsl.flirt(reg, ref, out=fsl.LOAD, omat=fsl.LOAD, log={"cmd" : sys.stdout}, **options)
-        transform = FlirtTransform(reg_data.grid, ref_data.grid, flirt_output["omat"])
+        logstream = six.StringIO()
+        flirt_output = fsl.flirt(reg, ref, out=fsl.LOAD, omat=fsl.LOAD, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
+        transform = FlirtTransform(ref_data.grid, flirt_output["omat"])
 
         if output_space == "ref":
             qpdata = fslimage_to_qpdata(flirt_output["out"], reg_data.name)
         elif output_space == "reg":
-            qpdata = fslimage_to_qpdata(flirt_output["out"], reg_data.name).resample(reg_data.grid)
+            qpdata = fslimage_to_qpdata(flirt_output["out"], reg_data.name).resample(reg_data.grid, suffix="")
             qpdata.name = reg_data.name
         elif output_space == "trans":
             trans_affine = transform.voxel_to_world(reg_data.grid)
             trans_grid = DataGrid(reg_data.grid.shape, trans_affine)
             qpdata = NumpyData(reg_data.raw(), grid=trans_grid, name=reg_data.name)
             
-        return qpdata, transform, "flirt log"
+        return qpdata, transform, logstream.getvalue()
       
     @classmethod
     def moco(cls, moco_data, ref, options, queue):
@@ -95,122 +123,56 @@ class FlirtRegMethod(RegMethod):
 
         if isinstance(ref, int):
             options["refvol"] = ref
+            ref_grid = moco_data.grid
         elif isinstance(ref, QpData):
             options["reffile"] = qpdata_to_fslimage(ref)
+            ref_grid = ref.grid
         else:
             raise QpException("invalid reference object type: %s" % type(ref))
             
-        mcflirt_output = fsl.mcflirt(reg, out=fsl.LOAD, **options)
-        print(mcflirt_output)
-        qpdata = fslimage_to_qpdata(mcflirt_output["out"], moco_data.name)
+        logstream = six.StringIO()
+        result = fsl.mcflirt(reg, out=fsl.LOAD, mats=fsl.LOAD, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
+        print(result)
+        qpdata = fslimage_to_qpdata(result["out"], moco_data.name)
+        transforms = [FlirtTransform(ref_grid, result["out.mat/MAT_%04i" % vol]) for vol in range(moco_data.nvols)]
         
-        return qpdata, None, "mcflirt log"
+        return qpdata, transforms, logstream.getvalue()
   
     def interface(self):
-        if self.options_layout is None:      
+        """
+        :return: QWidget containing registration options
+        """
+        if self.options_widget is None:    
+            self.options_widget = QtGui.QWidget()  
             vbox = QtGui.QVBoxLayout()
+            self.options_widget.setLayout(vbox)
 
             cite = Citation(CITE_TITLE, CITE_AUTHOR, CITE_JOURNAL)
             vbox.addWidget(cite)
 
-            grid = QtGui.QGridLayout()
+            self.optbox = OptionBox()
+            self.optbox.add("Cost Model", ChoiceOption(self.cost_models.keys(), self.cost_models.values()), key="cost")
+            self.optbox.option("cost").value = "corratio"
+            #self.optbox.add("Number of search stages", ChoiceOption([1, 2, 3, 4]), key="nstages")
+            #self.optbox.option("stages").value = 2
+            #self.optbox.add("Final stage interpolation", ChoiceOption(["None", "Sinc", "Spline", "Nearest neighbour"], ["", "sinc_final", "spline_final", "nn_final"]), key="final")
+            #self.optbox.add("Field of view (mm)", NumericOption(minval1, maxval=100, default=20), key="fov")
+            self.optbox.add("Number of bins", NumericOption(intonly=True, minval=1, maxval=1000, default=256), key="bins")
+            self.optbox.add("Degrees of freedom", ChoiceOption([6, 9, 12]), key="dof")
+            #self.optbox.add("Scaling", NumericOption(minval=0.1, maxval=10, default=6), key="scaling")
+            #self.optbox.add("Smoothing in cost function", NumericOption(minval=0.1, maxval=10, default=1), key="smoothing")
+            #self.optbox.add("Scaling factor for rotation\noptimization tolerances", NumericOption(minval=0.1, maxval=10, default=1), key="rotscale")
+            #self.optbox.add("Search on gradient images", BoolOption, key="grad")
 
-            grid.addWidget(QtGui.QLabel("Cost model"), 0, 0)
-            self.cost_combo = QtGui.QComboBox()
-            for name, opt in self.cost_models.items():
-                self.cost_combo.addItem(name, opt)
-            self.cost_combo.setCurrentIndex(self.cost_combo.findData("corratio"))
-            grid.addWidget(self.cost_combo, 0, 1)
-
-            grid.addWidget(QtGui.QLabel("Number of search stages"), 3, 0)
-            self.stages = QtGui.QComboBox()
-            for i in range(1, 5):
-                self.stages.addItem(str(i), i)
-            self.stages.setCurrentIndex(2)
-            grid.addWidget(self.stages, 3, 1)
-
-            self.final_label = QtGui.QLabel("Final stage interpolation")
-            grid.addWidget(self.final_label, 4, 0)
-            self.final = QtGui.QComboBox()
-            self.final.addItem("None", "")
-            self.final.addItem("Sinc", "sinc_final")
-            self.final.addItem("Spline", "spline_final")
-            self.final.addItem("Nearest neighbour", "nn_final")
-            grid.addWidget(self.final, 4, 1)
-
-            # grid.addWidget(QtGui.QLabel("Field of view (mm)"), 5, 0)
-            # self.fov = QtGui.QSpinBox()
-            # self.fov.setValue(20)
-            # self.fov.setMinimum(1)
-            # self.fov.setMaximum(100)
-            # grid.addWidget(self.fov, 5, 1)
-
-            grid.addWidget(QtGui.QLabel("Number of bins"), 6, 0)
-            self.num_bins = QtGui.QSpinBox()
-            self.num_bins.setMinimum(1)
-            self.num_bins.setMaximum(1000)
-            self.num_bins.setValue(256)
-            grid.addWidget(self.num_bins, 6, 1)
-
-            grid.addWidget(QtGui.QLabel("Number of transform degrees of freedom"), 7, 0)
-            self.num_dofs = QtGui.QSpinBox()
-            self.num_dofs.setMinimum(6)
-            self.num_dofs.setMaximum(12)
-            self.num_dofs.setValue(6)
-            grid.addWidget(self.num_dofs, 7, 1)
-
-            # grid.addWidget(QtGui.QLabel("Scaling"), 8, 0)
-            # self.scaling = QtGui.QDoubleSpinBox()
-            # self.scaling.setValue(6.0)
-            # self.scaling.setMinimum(0.1)
-            # self.scaling.setMaximum(10.0)
-            # self.scaling.setSingleStep(0.1)
-            # grid.addWidget(self.scaling, 8, 1)
-
-            # grid.addWidget(QtGui.QLabel("Smoothing in cost function"), 9, 0)
-            # self.smoothing = QtGui.QDoubleSpinBox()
-            # self.smoothing.setValue(1.0)
-            # self.smoothing.setMinimum(0.1)
-            # self.smoothing.setMaximum(10.0)
-            # self.smoothing.setSingleStep(0.1)
-            # grid.addWidget(self.smoothing, 9, 1)
-
-            # grid.addWidget(QtGui.QLabel("Scaling factor for rotation\noptimization tolerances"), 10, 0)
-            # self.rotation = QtGui.QDoubleSpinBox()
-            # self.rotation.setValue(1.0)
-            # self.rotation.setMinimum(0.1)
-            # self.rotation.setMaximum(10.0)
-            # self.rotation.setSingleStep(0.1)
-            # grid.addWidget(self.rotation, 10, 1)
-
-            grid.addWidget(QtGui.QLabel("Search on gradient images"), 11, 0)
-            self.gdt = QtGui.QCheckBox()
-            grid.addWidget(self.gdt, 11, 1)
-            grid.setColumnStretch(2, 1)
-            
-            vbox.addLayout(grid)
-            self.options_layout = vbox
-        return self.options_layout
+            vbox.addWidget(self.optbox)
+        return self.options_widget
 
     def options(self):
+        """
+        :return: Dictionary of registration options selected
+        """
         self.interface()
-        opts = {}
-        opts["cost"] = self.cost_combo.itemData(self.cost_combo.currentIndex())
-        opts["bins"] = self.num_bins.value()
-        opts["dof"] = self.num_dofs.value()
-        # opts["scaling"] = self.scaling.value()
-        # opts["smooth"] = self.smoothing.value()
-        # opts["rotation"] = self.rotation.value()
-        # opts["stages"] = self.stages.itemData(self.stages.currentIndex())
-        # opts["fov"] = self.fov.value()
-        # if self.gdt.isChecked(): opts["gdt"] = ""
-
-        # final_interp = self.final.currentIndex()
-        # if final_interp != 0: opts[self.final.itemData(final_interp)] = ""
-
+        opts = self.optbox.values()
         for key, value in opts.items():
             self.debug("%s: %s", key, value)
         return opts
-
-    def transform_type(self):
-        return FlirtTransform

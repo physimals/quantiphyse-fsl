@@ -18,10 +18,10 @@ class FlirtTransform(Extra):
     An Extra which defines a Flirt transformation
     """
 
-    def __init__(self, reg_grid, ref_grid, flirt_xfm):
+    def __init__(self, ref_grid, flirt_xfm):
         self.ref_grid = ref_grid
         self.flirt_xfm = flirt_xfm
-        self.w2w = self.world_to_world(reg_grid)
+        self.metadata["QpReg"] = "flirt"
 
     def __str__(self):
         """

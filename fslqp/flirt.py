@@ -21,13 +21,16 @@ CITE_JOURNAL = "NeuroImage, 17(2), 825-841, 2002"
 
 RegMethod = get_plugins("base-classes", class_name="RegMethod")[0]
 
+def _interp(order):
+    return {0 : "nearestneighbour", 1 : "trilinear", 2 : "spline", 3 : "spline"}[order]
+
 class FlirtRegMethod(RegMethod):
     """
     FLIRT/MCFLIRT registration method
     """
 
-    def __init__(self):
-        RegMethod.__init__(self, "flirt", "FLIRT/MCFLIRT")
+    def __init__(self, ivm):
+        RegMethod.__init__(self, "flirt", ivm, "FLIRT/MCFLIRT")
         self.options_widget = None
         self.cost_models = {"Mutual information" : "mutualinfo",
                             "Woods" : "woods",
@@ -35,7 +38,7 @@ class FlirtRegMethod(RegMethod):
                             "Normalized correlation" : "normcorr",
                             "Normalized mutual information" : "normmi",
                             "Least squares" : "leastsq"}
-
+        
     @classmethod
     def apply_transform(cls, reg_data, transform, options, queue):
         """
@@ -47,36 +50,35 @@ class FlirtRegMethod(RegMethod):
         the reference or registration spaces as required.
         """
         log = "Performing non-lossy affine transformation\n"
+        order = options.pop("interp-order", 1)
         affine = transform.voxel_to_world(reg_data.grid)
         grid = DataGrid(reg_data.grid.shape, affine)
         qpdata = NumpyData(reg_data.raw(), grid=grid, name=reg_data.name)
         
         output_space = options.pop("output-space", "ref")
         if output_space == "ref":
-            qpdata = qpdata.resample(transform.ref_grid, suffix="")
+            qpdata = qpdata.resample(transform.ref_grid, suffix="", order=order)
             log += "Resampling onto reference grid\n"
         elif output_space == "reg":
-            qpdata = qpdata.resample(transform.reg_grid, suffix="")
-            log += "Resampling onto reference grid\n"
+            qpdata = qpdata.resample(transform.reg_grid, suffix="", order=order)
+            log += "Resampling onto input grid\n"
             
-        print(qpdata.name)
         return qpdata, log
 
     @classmethod
     def reg_3d(cls, reg_data, ref_data, options, queue):
         """
         Static function for performing 3D registration
-
-        FIXME need to resolve output data space and return xform
         """
         from fsl import wrappers as fsl
         reg = qpdata_to_fslimage(reg_data)
         ref = qpdata_to_fslimage(ref_data)
         
         output_space = options.pop("output-space", "ref")
+        interp = _interp(options.pop("interp-order", 1))
         logstream = six.StringIO()
-        flirt_output = fsl.flirt(reg, ref, out=fsl.LOAD, omat=fsl.LOAD, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
-        transform = FlirtTransform(ref_data.grid, flirt_output["omat"])
+        flirt_output = fsl.flirt(reg, ref, interp=interp, out=fsl.LOAD, omat=fsl.LOAD, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
+        transform = FlirtTransform(ref_data.grid, flirt_output["omat"], name="flirt_xfm")
 
         if output_space == "ref":
             qpdata = fslimage_to_qpdata(flirt_output["out"], reg_data.name)
@@ -129,19 +131,22 @@ class FlirtRegMethod(RegMethod):
             ref_grid = ref.grid
         else:
             raise QpException("invalid reference object type: %s" % type(ref))
-            
+
+        interp = _interp(options.pop("interp-order", 1)) # FIXME ignored
         logstream = six.StringIO()
         result = fsl.mcflirt(reg, out=fsl.LOAD, mats=fsl.LOAD, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
-        print(result)
         qpdata = fslimage_to_qpdata(result["out"], moco_data.name)
         transforms = [FlirtTransform(ref_grid, result["out.mat/MAT_%04i" % vol]) for vol in range(moco_data.nvols)]
         
         return qpdata, transforms, logstream.getvalue()
   
-    def interface(self):
+    def interface(self, generic_options=None):
         """
         :return: QWidget containing registration options
         """
+        if generic_options is None:
+            generic_options = {}
+            
         if self.options_widget is None:    
             self.options_widget = QtGui.QWidget()  
             vbox = QtGui.QVBoxLayout()

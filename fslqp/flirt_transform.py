@@ -18,7 +18,8 @@ class FlirtTransform(Extra):
     An Extra which defines a Flirt transformation
     """
 
-    def __init__(self, ref_grid, flirt_xfm):
+    def __init__(self, ref_grid, flirt_xfm, name="flirt_xfm"):
+        Extra.__init__(self, name)
         self.ref_grid = ref_grid
         self.flirt_xfm = flirt_xfm
         self.metadata["QpReg"] = "flirt"

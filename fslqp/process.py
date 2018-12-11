@@ -12,6 +12,8 @@ import os
 import re
 import traceback
 
+import numpy as np
+
 from quantiphyse.data import QpData, NumpyData, DataGrid
 from quantiphyse.processes import Process
 from quantiphyse.utils import QpException
@@ -24,10 +26,16 @@ def qpdata_to_fslimage(qpd):
     from fsl.data.image import Image
     return Image(qpd.raw(), name=qpd.name, xform=qpd.grid.affine)
 
-def fslimage_to_qpdata(img, name=None):
+def fslimage_to_qpdata(img, name=None, vol=None, region=None):
     """ Convert fsl.data.Image to QpData """
     if not name: name = img.name
-    return NumpyData(img.data, grid=DataGrid(img.shape[:3], img.voxToWorldMat), name=name)
+    if vol is not None:
+        data = img.data[..., vol]
+    else:
+        data = img.data
+    if region is not None:
+        data = (data == region).astype(np.int)
+    return NumpyData(data, grid=DataGrid(img.shape[:3], img.voxToWorldMat), name=name)
 
 def _run_fsl(worker_id, queue, cmd, cmd_args):
     """

@@ -7,9 +7,11 @@ Copyright (c) 2016-2017 University of Oxford, Martin Craig
 from __future__ import division, unicode_literals, absolute_import, print_function
 
 import os
+import glob
 
 from PySide import QtGui, QtCore
 
+from quantiphyse.data import load
 from quantiphyse.gui.options import OptionBox, NumericOption, TextOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption
 from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation, WarningBox
 
@@ -174,7 +176,7 @@ class FslAtlasWidget(QpWidget):
     """
 
     def __init__(self, **kwargs):
-        super(FslAtlasWidget, self).__init__(name="FSL Atlases", icon="fsl", desc="Browse and display FSL atlases", group="FSL", **kwargs)
+        super(FslAtlasWidget, self).__init__(name="Atlases", icon="fsl.png", desc="Browse and display FSL atlases", group="FSL", **kwargs)
         from fsl.data.atlases import AtlasRegistry
         self._registry = AtlasRegistry()
 
@@ -319,3 +321,81 @@ class AtlasListWidget(QtGui.QTableView):
         name = self.model.item(row, 0).text()
         selected = self._atlases[name]
         self.sig_selected.emit(selected)
+
+class FslDataWidget(QpWidget):
+    """
+    Widget for browsing and loading standard FSL data sets
+    """
+
+    def __init__(self, **kwargs):
+        super(FslDataWidget, self).__init__(name="Standard Data", icon="fsl.png", desc="Browse and load standard FSL data sets", group="FSL", **kwargs)
+        self._selected = None
+
+    def init_ui(self):  
+        vbox = QtGui.QVBoxLayout()
+        self.setLayout(vbox)
+
+        vbox.addWidget(TitleWidget(self))
+        vbox.addWidget(Citation(*CITATIONS["fsl"]))
+
+        if "FSLDIR" not in os.environ and "FSLDEVDIR" not in os.environ:
+            vbox.addWidget(WarningBox(WARNING))
+            return
+        
+        self.data_list = FslDataListWidget(self)
+        vbox.addWidget(self.data_list)
+        self.data_list.sig_selected.connect(self._data_selected)
+        
+        hbox = QtGui.QHBoxLayout()
+        self._load_btn = QtGui.QPushButton("Load")
+        self._load_btn.clicked.connect(self._load)
+        hbox.addWidget( self._load_btn)
+        self._load_name = QtGui.QLineEdit()
+        hbox.addWidget(self._load_name)
+        vbox.addLayout(hbox)
+
+    def _data_selected(self, fname):
+        print(fname)
+        self._selected = fname
+        self._load_btn.setEnabled(bool(fname))
+        name = os.path.basename(fname).split(".", 1)[0]
+        self._load_name.setText(self.ivm.suggest_name(name))
+
+    def _load(self):
+        if self._selected:
+            qpdata = load(self._selected)
+            roi = "_mask_" in self._selected or "_mask." in self._selected
+            print(self._selected, "." in self._selected, "mask" in self._selected, "_mask_" in self._selected)
+            qpdata.roi = roi
+            self.ivm.add(qpdata, name=self._load_name.text())
+
+class FslDataListWidget(QtGui.QTableView):
+    """
+    Table showing standard FSL data sets
+    """
+
+    sig_selected = QtCore.Signal(object)
+
+    def __init__(self, parent):
+        super(FslDataListWidget, self).__init__(parent)
+        self._init_list()
+
+        self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        self.clicked.connect(self._clicked)
+
+    def _init_list(self):
+        self.model = QtGui.QStandardItemModel()
+        self.model.setColumnCount(1)
+        self.model.setHorizontalHeaderLabels(["File name"])
+        for fname in glob.glob(os.path.join(os.environ["FSLDIR"], "data", "standard", "*")):
+            if os.path.isfile(fname):
+                self.model.appendRow([QtGui.QStandardItem(os.path.basename(fname))])
+        self.setModel(self.model)
+        self.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
+
+    def _clicked(self, idx):
+        row = idx.row()
+        fname = self.model.item(row, 0).text()
+        self.sig_selected.emit(os.path.join(os.environ["FSLDIR"], "data", "standard", fname))

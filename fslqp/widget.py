@@ -8,12 +8,12 @@ from __future__ import division, unicode_literals, absolute_import, print_functi
 
 import os
 
-from PySide import QtGui
+from PySide import QtGui, QtCore
 
 from quantiphyse.gui.options import OptionBox, NumericOption, TextOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption
 from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation, WarningBox
 
-from .process import FastProcess, BetProcess, FslAnatProcess, FslMathsProcess
+from .process import FastProcess, BetProcess, FslAnatProcess, FslMathsProcess, fslimage_to_qpdata
 
 from ._version import __version__
 
@@ -167,3 +167,155 @@ class FslMathsWidget(FslWidget):
 
     def get_process(self):
         return FslMathsProcess(self.ivm)
+
+class FslAtlasWidget(QpWidget):
+    """
+    Widget for browsing and loading FSL atlases
+    """
+
+    def __init__(self, **kwargs):
+        super(FslAtlasWidget, self).__init__(name="FSL Atlases", icon="fsl", desc="Browse and display FSL atlases", group="FSL", **kwargs)
+        from fsl.data.atlases import AtlasRegistry
+        self._registry = AtlasRegistry()
+
+    def init_ui(self):  
+        vbox = QtGui.QVBoxLayout()
+        self.setLayout(vbox)
+
+        vbox.addWidget(TitleWidget(self))
+        vbox.addWidget(Citation(*CITATIONS["fsl"]))
+
+        if "FSLDIR" not in os.environ and "FSLDEVDIR" not in os.environ:
+            vbox.addWidget(WarningBox(WARNING))
+            return
+        
+        self._registry.rescanAtlases()
+        
+        self.atlas_list = AtlasListWidget(self, self._registry)
+        vbox.addWidget(self.atlas_list)
+        self.atlas_desc = AtlasDescription(self, self._registry)
+        vbox.addWidget(self.atlas_desc)
+
+        self.atlas_list.sig_selected.connect(self.atlas_desc.set_atlas)
+
+class AtlasDescription(QtGui.QGroupBox):
+    """
+    Displays atlas description
+    """
+
+    sig_selected = QtCore.Signal(object)
+
+    def __init__(self, parent, registry):
+        super(AtlasDescription, self).__init__(parent)
+        self._registry = registry
+        self.ivm = parent.ivm
+        self._desc = None
+        grid = QtGui.QGridLayout()
+        self.setLayout(grid)
+
+        grid.addWidget(QtGui.QLabel("Name"), 0, 0)
+        self._name = QtGui.QLabel()
+        grid.addWidget(self._name, 0, 1)
+        grid.addWidget(QtGui.QLabel("Type"), 1, 0)
+        self._type = QtGui.QLabel()
+        grid.addWidget(self._type, 1, 1)
+        grid.addWidget(QtGui.QLabel("Resolutions"), 2, 0)
+        self._imgs = QtGui.QComboBox()
+        grid.addWidget(self._imgs, 2, 1)
+
+        self._label_table = QtGui.QTableView()
+        self._label_model = QtGui.QStandardItemModel()
+        self._label_table.setModel(self._label_model)
+        self._label_table.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self._label_table.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self._label_table.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        grid.addWidget(self._label_table, 3, 0, 1, 2)
+        grid.setRowStretch(3, 1)
+        
+        hbox = QtGui.QHBoxLayout()
+        btn = QtGui.QPushButton("Load region")
+        btn.clicked.connect(self._load)
+        hbox.addWidget(btn)
+        btn = QtGui.QPushButton("Load all regions")
+        btn.clicked.connect(self._load_all)
+        hbox.addWidget(btn)
+        hbox.addStretch(1)
+        grid.addLayout(hbox, 4, 0, 1, 2)
+
+        grid.addWidget(QtGui.QLabel("Name"), 5, 0)
+        self._load_name = QtGui.QLineEdit()
+        grid.addWidget(self._load_name, 5, 1)
+
+    def set_atlas(self, atlas_desc):
+        self._desc = atlas_desc
+        self._name.setText(atlas_desc.name)
+        self._type.setText(atlas_desc.atlasType)
+        self._load_name.setText(atlas_desc.name + "_atlas")
+
+        self._imgs.clear()
+        for pixdim in atlas_desc.pixdims:
+            pixdim_str = "%.2g mm x %.2g mm x %.2g mm" % pixdim
+            self._imgs.addItem(pixdim_str, pixdim[0])
+            
+        self._label_model.clear()
+        self._label_model.setColumnCount(2)
+        self._label_model.setHorizontalHeaderLabels(["Index", "Name"])
+        for label in atlas_desc.labels:
+            index_item = QtGui.QStandardItem("%i" % label.index)
+            name_item = QtGui.QStandardItem(label.name)
+            self._label_model.appendRow([index_item, name_item])
+
+    def _load(self):
+        if self._desc is not None:
+            res = self._imgs.itemData(self._imgs.currentIndex())
+            atlas = self._registry.loadAtlas(self._desc.atlasID, loadSummary=False, resolution=res)
+            indexes = self._label_table.selectionModel().selectedRows()
+            idx = self._label_model.item(indexes[0].row(), 0).text()
+            if self._desc.atlasType == "label":
+                self.ivm.add(fslimage_to_qpdata(atlas, region=int(idx), name="atlas"), roi=True)
+            else:
+                self.ivm.add(fslimage_to_qpdata(atlas, vol=int(idx), name="atlas"))
+
+    def _load_all(self):
+        if self._desc is not None:
+            res = self._imgs.itemData(self._imgs.currentIndex())
+            atlas = self._registry.loadAtlas(self._desc.atlasID, loadSummary=False, resolution=res)
+            if self._desc.atlasType == "label":
+                self.ivm.add(fslimage_to_qpdata(atlas, name="atlas"), roi=True)
+            else:
+                self.ivm.add(fslimage_to_qpdata(atlas, name="atlas"))
+
+class AtlasListWidget(QtGui.QTableView):
+    """
+    Table showing available atlases
+    """
+
+    sig_selected = QtCore.Signal(object)
+
+    def __init__(self, parent, registry):
+        super(AtlasListWidget, self).__init__(parent)
+        self._registry = registry
+        self._atlases = {}
+        self._init_list()
+
+        self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        self.clicked.connect(self._clicked)
+
+    def _init_list(self):
+        self.model = QtGui.QStandardItemModel()
+        self.model.setColumnCount(2)
+        self.model.setHorizontalHeaderLabels(["Name", "Type"])
+        for atlas in self._registry.listAtlases():
+            self.model.appendRow([QtGui.QStandardItem(s) for s in (atlas.name, atlas.atlasType)])
+            self._atlases[atlas.name] = atlas
+        self.setModel(self.model)
+        self.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
+        self.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.ResizeToContents)
+
+    def _clicked(self, idx):
+        row = idx.row()
+        name = self.model.item(row, 0).text()
+        selected = self._atlases[name]
+        self.sig_selected.emit(selected)

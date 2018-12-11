@@ -355,7 +355,6 @@ class FslDataWidget(QpWidget):
         vbox.addLayout(hbox)
 
     def _data_selected(self, fname):
-        print(fname)
         self._selected = fname
         self._load_btn.setEnabled(bool(fname))
         name = os.path.basename(fname).split(".", 1)[0]
@@ -365,7 +364,6 @@ class FslDataWidget(QpWidget):
         if self._selected:
             qpdata = load(self._selected)
             roi = "_mask_" in self._selected or "_mask." in self._selected
-            print(self._selected, "." in self._selected, "mask" in self._selected, "_mask_" in self._selected)
             qpdata.roi = roi
             self.ivm.add(qpdata, name=self._load_name.text())
 

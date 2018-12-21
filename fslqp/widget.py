@@ -266,6 +266,8 @@ class AtlasDescription(QtGui.QGroupBox):
             index_item = QtGui.QStandardItem("%i" % label.index)
             name_item = QtGui.QStandardItem(label.name)
             self._label_model.appendRow([index_item, name_item])
+        self._label_table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.ResizeToContents)
+        self._label_table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
 
     def _load(self):
         if self._desc is not None:

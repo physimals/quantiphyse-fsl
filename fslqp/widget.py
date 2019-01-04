@@ -13,7 +13,8 @@ from PySide import QtGui, QtCore
 
 from quantiphyse.data import load
 from quantiphyse.gui.options import OptionBox, NumericOption, TextOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption
-from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation, WarningBox
+from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation, WarningBox, FslDirWidget
+from quantiphyse.utils import QpException
 
 from .process import FastProcess, BetProcess, FslAnatProcess, FslMathsProcess, fslimage_to_qpdata
 
@@ -59,22 +60,33 @@ class FslWidget(QpWidget):
         
         title = TitleWidget(self, help="fsl", subtitle="%s %s" % (self.description, __version__))
         self.vbox.addWidget(title)
-            
+
         cite = Citation(*CITATIONS.get(self.prog, CITATIONS["fsl"]))
         self.vbox.addWidget(cite)
 
         self.options = OptionBox("%s options" % self.prog.upper())
         self.vbox.addWidget(self.options)
 
-        if "FSLDIR" not in os.environ and "FSLDEVDIR" not in os.environ:
-            self.vbox.addWidget(WarningBox(WARNING))
-            self.options.setVisible(False)
-        elif run_box:
+        self.warning = WarningBox(WARNING)
+        self.vbox.addWidget(self.warning)
+        
+        if run_box:
             self.run_box = RunBox(self.get_process, self.get_options)
             self.vbox.addWidget(self.run_box)
         
         self.vbox.addStretch(1)
+
+        fsldir = FslDirWidget()
+        self.vbox.addWidget(fsldir)
+        fsldir.sig_changed.connect(self._fsldir_changed)
+        self._fsldir_changed(fsldir.fsldir)
         
+    def _fsldir_changed(self, fsldir):
+        self.options.setVisible(bool(fsldir))
+        if hasattr(self, "run_box"):
+            self.run_box.setVisible(bool(fsldir))
+        self.warning.setVisible(not bool(fsldir))
+
     def batch_options(self):
         return self.get_process().PROCESS_NAME, self.get_options()
 

@@ -37,7 +37,7 @@ def fslimage_to_qpdata(img, name=None, vol=None, region=None):
         data = (data == region).astype(np.int)
     return NumpyData(data, grid=DataGrid(img.shape[:3], img.voxToWorldMat), name=name)
 
-def _run_fsl(worker_id, queue, cmd, cmd_args):
+def _run_fsl(worker_id, queue, fsldir, fsldevdir, cmd, cmd_args):
     """
     Background process worker function which runs an FSL wrapper command
     
@@ -50,9 +50,16 @@ def _run_fsl(worker_id, queue, cmd, cmd_args):
     from fsl.data.image import Image
     import fsl.wrappers as fslwrap
     try:
+        if "FSLOUTPUTTYPE" not in os.environ:
+            os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+        if fsldir:
+            os.environ["FSLDIR"] = fsldir
+        if fsldevdir:
+            os.environ["FSLDEVDIR"] = fsldevdir
+
         # Get the FSL wrapper function from the name of the command
         cmd_fn = getattr(fslwrap, cmd)
-
+        
         for key in cmd_args.keys():
             val = cmd_args[key]
             if isinstance(val, QpData):
@@ -82,14 +89,7 @@ class FslProcess(Process):
 
     def __init__(self, ivm, **kwargs):
         Process.__init__(self, ivm, worker_fn=_run_fsl, **kwargs)
-        path = []
-        if "FSLDIR" in os.environ:
-            path.append(os.path.join(os.environ["FSLDIR"], "bin"))
-        if "FSLDEVDIR" in os.environ:
-            path.append(os.path.join(os.environ["FSLDEVDIR"], "bin"))
-        if "FSLOUTPUTTYPE" not in os.environ:
-            os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
-
+     
     def run(self, options):
         """
         Run an FSL wrapper command
@@ -103,10 +103,15 @@ class FslProcess(Process):
         self._current_roi = None
 
         # Get the command to run and it's arguments (as a dict)
+        fsldir, fsldevdir = None, None
+        if "FSLDIR" in os.environ:
+            fsldir = os.environ["FSLDIR"]
+        if "FSLDEVDIR" in os.environ:
+            fsldevdir = os.environ["FSLDEVDIR"]
         cmd, cmd_args = self.init_cmd(options)
 
         # Run as background process
-        args = [cmd, cmd_args]
+        args = [fsldir, fsldevdir, cmd, cmd_args]
         self.debug(args)
         self.start_bg(args, n_workers=1)
 

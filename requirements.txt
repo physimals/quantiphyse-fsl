@@ -1,0 +1,5 @@
+quantiphyse
+fslpy>=1.13
+six
+numpy
+pyside

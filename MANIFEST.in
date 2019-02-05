@@ -1,2 +1,2 @@
-include requirements.txt
+include LICENSE requirements.txt
 include quantiphyse_fsl/*.png quantiphyse_fsl/*.svg

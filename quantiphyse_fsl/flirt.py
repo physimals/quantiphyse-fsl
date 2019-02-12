@@ -32,12 +32,11 @@ class FlirtRegMethod(RegMethod):
     def __init__(self, ivm):
         RegMethod.__init__(self, "flirt", ivm, "FLIRT/MCFLIRT")
         self.options_widget = None
-        self.cost_models = {"Mutual information" : "mutualinfo",
-                            "Woods" : "woods",
-                            "Correlation ratio" : "corratio",
-                            "Normalized correlation" : "normcorr",
-                            "Normalized mutual information" : "normmi",
-                            "Least squares" : "leastsq"}
+        self.cost_models = ["Mutual information", "Woods", "Correlation ratio",
+                            "Normalized correlation", "Normalized mutual information",
+                            "Least squares"]
+        self.cost_model_options = ["mutualinfo", "woods", "corratio", "normcorr",
+                                   "normmi", "leastsq"]
         
     @classmethod
     def apply_transform(cls, reg_data, transform, options, queue):
@@ -76,8 +75,9 @@ class FlirtRegMethod(RegMethod):
         
         output_space = options.pop("output-space", "ref")
         interp = _interp(options.pop("interp-order", 1))
+        twod = reg_data.grid.shape[2] == 1
         logstream = six.StringIO()
-        flirt_output = fsl.flirt(reg, ref, interp=interp, out=fsl.LOAD, omat=fsl.LOAD, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
+        flirt_output = fsl.flirt(reg, ref, interp=interp, out=fsl.LOAD, omat=fsl.LOAD, twod=twod, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
         transform = FlirtTransform(ref_data.grid, flirt_output["omat"], name="flirt_xfm")
 
         if output_space == "ref":
@@ -133,8 +133,9 @@ class FlirtRegMethod(RegMethod):
             raise QpException("invalid reference object type: %s" % type(ref))
 
         interp = _interp(options.pop("interp-order", 1)) # FIXME ignored
+        twod = moco_data.grid.shape[2] == 1
         logstream = six.StringIO()
-        result = fsl.mcflirt(reg, out=fsl.LOAD, mats=fsl.LOAD, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
+        result = fsl.mcflirt(reg, out=fsl.LOAD, mats=fsl.LOAD, twod=twod, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
         qpdata = fslimage_to_qpdata(result["out"], moco_data.name)
         transforms = [FlirtTransform(ref_grid, result["out.mat/MAT_%04i" % vol]) for vol in range(moco_data.nvols)]
         
@@ -156,8 +157,7 @@ class FlirtRegMethod(RegMethod):
             vbox.addWidget(cite)
 
             self.optbox = OptionBox()
-            self.optbox.add("Cost Model", ChoiceOption(self.cost_models.keys(), self.cost_models.values()), key="cost")
-            self.optbox.option("cost").value = "corratio"
+            self.optbox.add("Cost Model", ChoiceOption(self.cost_models, self.cost_model_options, default="normcorr"), key="cost")
             #self.optbox.add("Number of search stages", ChoiceOption([1, 2, 3, 4]), key="nstages")
             #self.optbox.option("stages").value = 2
             #self.optbox.add("Final stage interpolation", ChoiceOption(["None", "Sinc", "Spline", "Nearest neighbour"], ["", "sinc_final", "spline_final", "nn_final"]), key="final")

@@ -3,6 +3,7 @@ Quantiphyse - Registration method using FSL FLIRT/MCFLIRT wrappers
 
 Copyright (c) 2013-2018 University of Oxford
 """
+import os
 import six
 from PySide import QtGui
 
@@ -137,7 +138,7 @@ class FlirtRegMethod(RegMethod):
         logstream = six.StringIO()
         result = fsl.mcflirt(reg, out=fsl.LOAD, mats=fsl.LOAD, twod=twod, log={"cmd" : logstream, "stdout" : logstream, "stderr" : logstream}, **options)
         qpdata = fslimage_to_qpdata(result["out"], moco_data.name)
-        transforms = [FlirtTransform(ref_grid, result["out.mat/MAT_%04i" % vol]) for vol in range(moco_data.nvols)]
+        transforms = [FlirtTransform(ref_grid, result[os.path.join("out.mat", "MAT_%04i" % vol)]) for vol in range(moco_data.nvols)]
         
         return qpdata, transforms, logstream.getvalue()
   

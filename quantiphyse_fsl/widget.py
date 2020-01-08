@@ -14,7 +14,7 @@ try:
 except ImportError:
     from PySide2 import QtGui, QtCore, QtWidgets
 
-from quantiphyse.data import load
+from quantiphyse.data import load, NumpyData
 from quantiphyse.gui.options import OptionBox, NumericOption, TextOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption
 from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation, WarningBox, FslDirWidget
 from quantiphyse.utils import QpException
@@ -249,26 +249,28 @@ class AtlasDescription(QtGui.QGroupBox):
         grid.addWidget(self._label_table, 3, 0, 1, 2)
         grid.setRowStretch(3, 1)
         
+        self._load_options = OptionBox()
+        self._load_options.add("Regions", ChoiceOption(["Selected region", "All regions"], ["sel", "all"]), key="regions")
+        self._load_options.add("Load as", ChoiceOption(["New dataset", "Add to existing dataset"], ["new", "add"]), key="add")
+        self._load_options.add("Dataset name", TextOption("atlas"), key="name")
+        self._load_options.add("Existing dataset", DataOption(self.ivm), key="data")
+        self._load_options.option("add").sig_changed.connect(self._add_changed)
+        grid.addWidget(self._load_options, 4, 0, 1, 2)
+
         hbox = QtGui.QHBoxLayout()
-        btn = QtGui.QPushButton("Load region")
+        btn = QtGui.QPushButton("Load")
         btn.clicked.connect(self._load)
         hbox.addWidget(btn)
-        btn = QtGui.QPushButton("Load all regions")
-        btn.clicked.connect(self._load_all)
-        hbox.addWidget(btn)
         hbox.addStretch(1)
-        grid.addLayout(hbox, 4, 0, 1, 2)
-
-        grid.addWidget(QtGui.QLabel("Name"), 5, 0)
-        self._load_name = QtGui.QLineEdit()
-        grid.addWidget(self._load_name, 5, 1)
+        grid.addLayout(hbox, 5, 0, 1, 2)
+        self._add_changed()
 
     def set_atlas(self, atlas_desc):
         self._desc = atlas_desc
         self._name.setText(atlas_desc.name)
         self._type.setText(atlas_desc.atlasType)
-        self._load_name.setText(atlas_desc.name + "_atlas")
-
+        self._load_options.option("name").value = atlas_desc.name.replace(" ", "_").replace("-", "_").lower()
+        
         self._imgs.clear()
         for pixdim in atlas_desc.pixdims:
             pixdim_str = "%.2g mm x %.2g mm x %.2g mm" % pixdim
@@ -284,31 +286,45 @@ class AtlasDescription(QtGui.QGroupBox):
         self._label_table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.ResizeToContents)
         self._label_table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
 
+    def _add_changed(self):
+        add = self._load_options.values()["add"] == "add"
+        self._load_options.set_visible("name", not add)
+        self._load_options.set_visible("data", add)
+
     def _load(self):
         if self._desc is not None:
             res = self._imgs.itemData(self._imgs.currentIndex())
             atlas = self._registry.loadAtlas(self._desc.atlasID, loadSummary=False, resolution=res)
-            indexes = self._label_table.selectionModel().selectedRows()
-            idx = self._label_model.item(indexes[0].row(), 0).text()
-            if self._desc.atlasType == "label":
-                self.ivm.add(fslimage_to_qpdata(atlas, region=int(idx), name="atlas"), roi=True)
-            else:
-                self.ivm.add(fslimage_to_qpdata(atlas, vol=int(idx), name="atlas"))
+            is_roi = self._desc.atlasType == "label"
 
-    def _load_all(self):
-        if self._desc is not None:
-            res = self._imgs.itemData(self._imgs.currentIndex())
-            atlas = self._registry.loadAtlas(self._desc.atlasID, loadSummary=False, resolution=res)
-            if self._desc.atlasType == "label":
-                self.ivm.add(fslimage_to_qpdata(atlas, name="atlas"), roi=True)
-            else:
-                self.ivm.add(fslimage_to_qpdata(atlas, name="atlas"))
+            new_name = self._load_options.option("name").value
+            add_name = self._load_options.option("data").value
+            add = self._load_options.option("add").value == "add"
+            load_all = self._load_options.option("regions").value == "all"
+
+            vol = None
+            if not load_all:
+                indexes = self._label_table.selectionModel().selectedRows()
+                vol = int(self._label_model.item(indexes[0].row(), 0).text())
+            new_data = fslimage_to_qpdata(atlas, vol=vol, name=new_name)
+
+            if add and add_name in self.ivm.data:
+                # User wants to add the region to an existing data set
+                if load_all:
+                    raise QpException("Cannot add data to existing data set when loading all regions")
+                orig_data = self.ivm.data[add_name]
+                if not orig_data.grid.matches(new_data.grid):
+                    raise QpException("Can't add data to existing data set - grids do not match")
+                if is_roi and not orig_data.roi:
+                    raise QpException("Can't add data to existing data set - it is not an ROI")
+                new_data = NumpyData(orig_data.raw() + new_data.raw(), grid=new_data.grid, name=add_name)
+                
+            self.ivm.add(new_data, roi=is_roi)
 
 class AtlasListWidget(QtGui.QTableView):
     """
     Table showing available atlases
     """
-
     sig_selected = QtCore.Signal(object)
 
     def __init__(self, parent, registry):
@@ -326,7 +342,7 @@ class AtlasListWidget(QtGui.QTableView):
         self.model = QtGui.QStandardItemModel()
         self.model.setColumnCount(2)
         self.model.setHorizontalHeaderLabels(["Name", "Type"])
-        for atlas in self._registry.listAtlases():
+        for atlas in sorted(self._registry.listAtlases(), key=lambda x: x.name):
             self.model.appendRow([QtGui.QStandardItem(s) for s in (atlas.name, atlas.atlasType)])
             self._atlases[atlas.name] = atlas
         self.setModel(self.model)
@@ -366,7 +382,8 @@ class FslDataWidget(QpWidget):
         hbox = QtGui.QHBoxLayout()
         self._load_btn = QtGui.QPushButton("Load")
         self._load_btn.clicked.connect(self._load)
-        hbox.addWidget( self._load_btn)
+        hbox.addWidget(self._load_btn)
+        hbox.addWidget(QtGui.QLabel("Dataset name: "))
         self._load_name = QtGui.QLineEdit()
         hbox.addWidget(self._load_name)
         vbox.addLayout(hbox)
@@ -404,7 +421,7 @@ class FslDataListWidget(QtGui.QTableView):
         self.model = QtGui.QStandardItemModel()
         self.model.setColumnCount(1)
         self.model.setHorizontalHeaderLabels(["File name"])
-        for fname in glob.glob(os.path.join(os.environ["FSLDIR"], "data", "standard", "*")):
+        for fname in sorted(glob.glob(os.path.join(os.environ["FSLDIR"], "data", "standard", "*"))):
             if os.path.isfile(fname):
                 self.model.appendRow([QtGui.QStandardItem(os.path.basename(fname))])
         self.setModel(self.model)

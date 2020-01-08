@@ -201,7 +201,7 @@ class FastProcess(FslProcess):
             options["B"] = True
             self._output_data["out_restore"] = "%s_restore" % data.name
         
-        self._expected_steps = ["Tanaka Iteration",] * (options.pop("iter") + options.pop("fixed"))
+        self._expected_steps = ["Tanaka Iteration",] * (options.pop("iter", 4) + options.pop("fixed", 4))
 
         options.update({"verbose" : True, "imgs" : data, "out" : _LOAD})
         return "fast", options

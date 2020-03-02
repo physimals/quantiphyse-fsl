@@ -51,6 +51,10 @@ class FnirtRegMethod(RegMethod):
         """
         Apply a previously calculated transformation to a data set
         """
+        output_space = options.pop("output-space", "ref")
+        if output_space not in ("ref", "reg"):
+            raise QpException("FNIRT does not support output in transformed space")
+
         from fsl import wrappers as fsl
         reg = qpdata_to_fslimage(reg_data)
         trans = qpdata_to_fslimage(transform)
@@ -68,15 +72,12 @@ class FnirtRegMethod(RegMethod):
                                      warp=trans, rel=True)                       
         qpdata = fslimage_to_qpdata(apply_output["out"], name=reg_data.name)
 
-        output_space = options.pop("output-space", "ref")
         if output_space == "ref":
             # Default is to output in reference space
             pass
-        elif output_space == "reg":
+        else:
             qpdata = qpdata.resample(reg_data.grid, suffix="", order=order)
             log += "Resampling onto input grid\n"
-        else:
-            raise QpException("FNIRT does not support output in transformed space")
 
         return qpdata, log.getvalue()
 
@@ -87,11 +88,14 @@ class FnirtRegMethod(RegMethod):
 
         FIXME return jacobian as part of xform?
         """
+        output_space = options.pop("output-space", "ref")
+        if output_space not in ("ref", "reg"):
+            raise QpException("FNIRT does not support output in transformed space")
+
         from fsl import wrappers as fsl
         reg = qpdata_to_fslimage(reg_data)
         ref = qpdata_to_fslimage(ref_data)
         
-        output_space = options.pop("output-space", "ref")
         log = six.StringIO()
         fnirt_output = fsl.fnirt(reg, ref=ref, iout=fsl.LOAD, fout=fsl.LOAD, log={"cmd" : log, "stdout" : log, "stderr" : log}, **options)
         transform = fslimage_to_qpdata(fnirt_output["fout"], name="fnirt_warp")
@@ -99,11 +103,9 @@ class FnirtRegMethod(RegMethod):
 
         if output_space == "ref":
             qpdata = fslimage_to_qpdata(fnirt_output["iout"], name=reg_data.name)
-        elif output_space == "reg":
-            qpdata = fslimage_to_qpdata(fnirt_output["iout"], name=reg_data.name).resample(reg_data.grid, suffix="")
         else:
-            raise QpException("FNIRT does not support output in transformed space")
-            
+            qpdata = fslimage_to_qpdata(fnirt_output["iout"], name=reg_data.name).resample(reg_data.grid, suffix="")
+
         return qpdata, transform, log.getvalue()
       
     def interface(self, generic_options=None):

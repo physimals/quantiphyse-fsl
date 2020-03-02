@@ -59,9 +59,9 @@ def _run_fsl(worker_id, queue, fsldir, fsldevdir, cmd, cmd_args):
     parameter. Also, the special fsl.LOAD object is not pickleable either
     so we pass our own special LOAD object (which is just a magic string).
     """
-    from fsl.data.image import Image
-    import fsl.wrappers as fslwrap
     try:
+        from fsl.data.image import Image
+        import fsl.wrappers as fslwrap
         if "FSLOUTPUTTYPE" not in os.environ:
             os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
         if fsldir:
@@ -81,7 +81,7 @@ def _run_fsl(worker_id, queue, fsldir, fsldevdir, cmd, cmd_args):
 
         progress_watcher = OutputStreamMonitor(queue)
         cmd_result = cmd_fn(log={"stdout" : progress_watcher, "cmd" : progress_watcher}, **cmd_args)
-
+        
         ret = {}
         for key in cmd_result.keys():
             val = cmd_result[key]
@@ -213,7 +213,7 @@ class FastProcess(FslProcess):
             options["B"] = True
             self._output_data["out_restore"] = "%s_restore" % data.name
         
-        self._expected_steps = ["Tanaka Iteration",] * (options.pop("iter") + options.pop("fixed"))
+        self._expected_steps = ["Tanaka Iteration",] * (options.pop("iter", 4) + options.pop("fixed", 4))
 
         options.update({"verbose" : True, "imgs" : data, "out" : _LOAD})
         return "fast", options
@@ -358,5 +358,4 @@ class FslMathsProcess(Process):
             self.debug("Executing %s(%s)", current_method, current_args)
             proc = current_method(*current_args)
         ret = proc.run()
-        print(ret)
         self.ivm.add(fslimage_to_qpdata(ret), name=output_data)

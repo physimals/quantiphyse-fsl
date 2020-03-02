@@ -29,6 +29,14 @@ RegMethod = get_plugins("base-classes", class_name="RegMethod")[0]
 def _interp(order):
     return {0 : "nearestneighbour", 1 : "trilinear", 2 : "spline", 3 : "spline"}[order]
 
+def set_environ(options):    
+    for env_copy in ["FSLOUTPUTTYPE", "FSLDIR", "FSLDEVDIR"]:
+        if env_copy in options:
+            os.environ[env_copy] = options.pop(env_copy)
+            
+    if "FSLOUTPUTTYPE" not in os.environ:
+        os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+
 class FlirtRegMethod(RegMethod):
     """
     FLIRT/MCFLIRT registration method
@@ -77,7 +85,9 @@ class FlirtRegMethod(RegMethod):
         from fsl import wrappers as fsl
         reg = qpdata_to_fslimage(reg_data)
         ref = qpdata_to_fslimage(ref_data)
-        
+
+        set_environ(options)
+
         output_space = options.pop("output-space", "ref")
         interp = _interp(options.pop("interp-order", 1))
         twod = reg_data.grid.shape[2] == 1
@@ -125,6 +135,8 @@ class FlirtRegMethod(RegMethod):
         from fsl import wrappers as fsl
         if moco_data.ndim != 4:
             raise QpException("Cannot motion correct 3D data")
+
+        set_environ(options)
 
         reg = qpdata_to_fslimage(moco_data)
 
@@ -183,6 +195,12 @@ class FlirtRegMethod(RegMethod):
         """
         self.interface()
         opts = self.optbox.values()
+        for env_copy in ["FSLOUTPUTTYPE", "FSLDIR", "FSLDEVDIR"]:
+            if env_copy in os.environ:
+                opts[env_copy] = os.environ[env_copy]
+            else:
+                self.debug("%s is not in environment" % env_copy)
+
         for key, value in opts.items():
             self.debug("%s: %s", key, value)
         return opts

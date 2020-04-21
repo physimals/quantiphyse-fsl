@@ -17,7 +17,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
-from .widget import FastWidget, BetWidget, FslAnatWidget, FslMathsWidget, FslAtlasWidget, FslDataWidget
+from .widget import FslDirWidget, FastWidget, BetWidget, FslAnatWidget, FslMathsWidget, FslAtlasWidget, FslDataWidget
 from .process import FslProcess, FastProcess, BetProcess
 from .flirt import FlirtRegMethod
 from .fnirt import FnirtRegMethod
@@ -31,6 +31,7 @@ QP_MANIFEST = {
     "widgets" : [FastWidget, BetWidget, FslAnatWidget, FslMathsWidget, FslAtlasWidget, FslDataWidget],
     "processes" : [FslProcess, FastProcess, BetProcess],
     "reg-methods" : [FlirtRegMethod, FnirtRegMethod],
+    "qwidgets" : [FslDirWidget],
     "module-dirs" : ["deps",],
     "process-tests" : [FlirtProcessTest, ],
 }

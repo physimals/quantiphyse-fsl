@@ -26,6 +26,8 @@ try:
 except ImportError:
     from PySide2 import QtGui, QtCore, QtWidgets
 
+from fsl.data.atlases import AtlasRegistry
+
 from quantiphyse.data import load, NumpyData
 from quantiphyse.gui.options import OptionBox, NumericOption, TextOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption
 from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation, WarningBox, FslDirWidget
@@ -204,7 +206,6 @@ class FslAtlasWidget(QpWidget):
 
     def __init__(self, **kwargs):
         super(FslAtlasWidget, self).__init__(name="Atlases", icon="fsl.png", desc="Browse and display FSL atlases", group="FSL", **kwargs)
-        from fsl.data.atlases import AtlasRegistry
         self._registry = AtlasRegistry()
 
     def init_ui(self):  
@@ -213,12 +214,6 @@ class FslAtlasWidget(QpWidget):
 
         vbox.addWidget(TitleWidget(self))
         vbox.addWidget(Citation(*CITATIONS["fsl"]))
-
-        if "FSLDIR" not in os.environ and "FSLDEVDIR" not in os.environ:
-            vbox.addWidget(WarningBox(WARNING))
-            return
-        
-        self._registry.rescanAtlases()
         
         self.atlas_list = AtlasListWidget(self, self._registry)
         vbox.addWidget(self.atlas_list)
@@ -226,6 +221,14 @@ class FslAtlasWidget(QpWidget):
         vbox.addWidget(self.atlas_desc)
 
         self.atlas_list.sig_selected.connect(self.atlas_desc.set_atlas)
+
+        fsldir = FslDirWidget()
+        vbox.addWidget(fsldir)
+
+        # This needs to be done after creating the FslDirWidget because otherwise we may not
+        # have picked up a previously saved FSLDIR setting and the atlas list will be empty
+        self._registry.rescanAtlases()
+        self.atlas_list.init_list()
 
 class AtlasDescription(QtGui.QGroupBox):
     """
@@ -258,6 +261,14 @@ class AtlasDescription(QtGui.QGroupBox):
         self._label_table.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
         self._label_table.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
         self._label_table.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+
+        self._label_table.setStyleSheet("font-size: 10px; alternate-background-color: #6c6c6c;")
+        self._label_table.setShowGrid(False)
+        self._label_table.setTextElideMode(QtCore.Qt.ElideLeft)
+        self._label_table.setAlternatingRowColors(True)
+        self._label_table.verticalHeader().setVisible(False)
+        self._label_table.verticalHeader().setDefaultSectionSize(self._label_table.verticalHeader().minimumSectionSize()+2)
+
         grid.addWidget(self._label_table, 3, 0, 1, 2)
         grid.setRowStretch(3, 1)
         
@@ -341,16 +352,23 @@ class AtlasListWidget(QtGui.QTableView):
 
     def __init__(self, parent, registry):
         super(AtlasListWidget, self).__init__(parent)
+        self.setStyleSheet("font-size: 10px; alternate-background-color: #6c6c6c;")
+        self.setShowGrid(False)
+        self.setTextElideMode(QtCore.Qt.ElideLeft)
+        self.setAlternatingRowColors(True)
+        self.verticalHeader().setVisible(False)
+        self.verticalHeader().setDefaultSectionSize(self.verticalHeader().minimumSectionSize()+2)
+
         self._registry = registry
         self._atlases = {}
-        self._init_list()
+        self.init_list()
 
         self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
         self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
         self.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
         self.clicked.connect(self._clicked)
 
-    def _init_list(self):
+    def init_list(self):
         self.model = QtGui.QStandardItemModel()
         self.model.setColumnCount(2)
         self.model.setHorizontalHeaderLabels(["Name", "Type"])
@@ -400,6 +418,9 @@ class FslDataWidget(QpWidget):
         hbox.addWidget(self._load_name)
         vbox.addLayout(hbox)
 
+        fsldir = FslDirWidget()
+        vbox.addWidget(fsldir)
+
     def _data_selected(self, fname):
         self._selected = fname
         self._load_btn.setEnabled(bool(fname))
@@ -422,6 +443,12 @@ class FslDataListWidget(QtGui.QTableView):
 
     def __init__(self, parent):
         super(FslDataListWidget, self).__init__(parent)
+        self.setStyleSheet("font-size: 10px; alternate-background-color: #6c6c6c;")
+        self.setShowGrid(False)
+        self.setTextElideMode(QtCore.Qt.ElideLeft)
+        self.setAlternatingRowColors(True)
+        self.verticalHeader().setVisible(False)
+        self.verticalHeader().setDefaultSectionSize(self.verticalHeader().minimumSectionSize()+2)
         self._init_list()
 
         self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)

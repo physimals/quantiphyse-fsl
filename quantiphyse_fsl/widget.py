@@ -18,6 +18,7 @@ limitations under the License.
 
 from __future__ import division, unicode_literals, absolute_import, print_function
 
+import sys
 import os
 import glob
 
@@ -28,8 +29,9 @@ except ImportError:
 
 from fsl.data.atlases import AtlasRegistry
 
+import quantiphyse
 from quantiphyse.data import load, NumpyData
-from quantiphyse.gui.options import OptionBox, NumericOption, TextOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption
+from quantiphyse.gui.options import OptionBox, NumericOption, TextOption, OutputNameOption, DataOption, BoolOption, ChoiceOption, PickPointOption, FileOption
 from quantiphyse.gui.widgets import QpWidget, RunBox, TitleWidget, Citation, ElidedLabel
 from quantiphyse.utils import QpException
 
@@ -142,7 +144,6 @@ class FslDirWidget(QtGui.QFrame):
         return os.environ.get("FSLDIR", None), os.environ.get("FSLDEVDIR", None)
 
     def _change_fsldir(self):
-        changed = False
         dialog = FslDirDialog(self.fsldir, self.fsldevdir)
         response = dialog.exec_()
         if response:
@@ -177,6 +178,8 @@ class FslDirWidget(QtGui.QFrame):
             self._fsldir_label.setToolTip("")
 
     def _possible_fsldir(self, folder):
+        print("FSLDIR=", folder)
+        print(os.path.exists(folder))
         return os.path.isfile(os.path.join(folder, "bin", "flirt"))
 
 class FslDirDialog(QtGui.QDialog):
@@ -206,7 +209,7 @@ class FslDirDialog(QtGui.QDialog):
         self.setLayout(vbox)
 
     def _fsldir_changed(self):
-        fsldevdir = self.optbox.option("fsldir").value
+        fsldir = self.optbox.option("fsldir").value
         self.optbox.option("fsldir").value = self._check_dir(fsldir)
 
     def _fsldevdir_changed(self):
@@ -214,11 +217,17 @@ class FslDirDialog(QtGui.QDialog):
         self.optbox.option("fsldevdir").value = self._check_dir(fsldevdir)
 
     def _check_dir(self, dir):
-        # On Windows, look for the dir under \\wsl$\ as well because QFileDialog
-        # does not return this part of the path
+        # Seems to be a bug in QFileDialog that returns UNC WSL filepath with forward not
+        # back slashes which causes fslpy to fail
+        if dir.startswith("//wsl$"):
+            dir = dir.replace("//wsl$", "\\\\wsl$", 1)
+
         prefixes = [""]
         if sys.platform.startswith("win"):
+            # On Windows, look for the dir under \\wsl$\ as well because sometimes QFileDialog
+            # does not return this part of the path
             prefixes.append("\\\\wsl$")
+
         for prefix in prefixes:
             trial_dir = prefix + dir
             if os.path.exists(trial_dir):

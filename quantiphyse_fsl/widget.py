@@ -178,8 +178,6 @@ class FslDirWidget(QtGui.QFrame):
             self._fsldir_label.setToolTip("")
 
     def _possible_fsldir(self, folder):
-        print("FSLDIR=", folder)
-        print(os.path.exists(folder))
         return os.path.isfile(os.path.join(folder, "bin", "flirt"))
 
 class FslDirDialog(QtGui.QDialog):
@@ -488,10 +486,11 @@ class AtlasDescription(QtGui.QGroupBox):
     def _region_changed(self):
         if self._load_options.values()["regions"] == "sel":
             indexes = self._label_table.selectionModel().selectedRows()
-            region_name = self._label_model.item(indexes[0].row(), 1).text()
-            if region_name:
-                load_name = region_name.replace(" ", "_").replace("-", "_").replace(",", "").replace("(", "").replace(")", "").lower()
-                self._load_options.option("name").value = load_name
+            if indexes:
+                region_name = self._label_model.item(indexes[0].row(), 1).text()
+                if region_name:
+                    load_name = region_name.replace(" ", "_").replace("-", "_").replace(",", "").replace("(", "").replace(")", "").lower()
+                    self._load_options.option("name").value = load_name
 
     def _add_changed(self):
         add = self._load_options.values()["add"] == "add"

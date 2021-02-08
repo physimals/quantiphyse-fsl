@@ -436,6 +436,7 @@ class AtlasDescription(QtGui.QGroupBox):
         self._label_table.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
         self._label_table.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
         self._label_table.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        self._label_table.selectionModel().selectionChanged.connect(self._region_changed)
 
         self._label_table.setStyleSheet("font-size: 10px; alternate-background-color: #6c6c6c;")
         self._label_table.setShowGrid(False)
@@ -483,6 +484,14 @@ class AtlasDescription(QtGui.QGroupBox):
             self._label_model.appendRow([index_item, name_item])
         self._label_table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.ResizeToContents)
         self._label_table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
+
+    def _region_changed(self):
+        if self._load_options.values()["regions"] == "sel":
+            indexes = self._label_table.selectionModel().selectedRows()
+            region_name = self._label_model.item(indexes[0].row(), 1).text()
+            if region_name:
+                load_name = region_name.replace(" ", "_").replace("-", "_").replace(",", "").replace("(", "").replace(")", "").lower()
+                self._load_options.option("name").value = load_name
 
     def _add_changed(self):
         add = self._load_options.values()["add"] == "add"

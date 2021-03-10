@@ -451,6 +451,7 @@ class AtlasDescription(QtGui.QGroupBox):
         self._load_options.add("Load as", ChoiceOption(["New dataset", "Add to existing dataset"], ["new", "add"]), key="add")
         self._load_options.add("Dataset name", TextOption("atlas"), key="name")
         self._load_options.add("Existing dataset", DataOption(self.ivm), key="data")
+        self._load_options.option("regions").sig_changed.connect(self._load_regions_changed)
         self._load_options.option("add").sig_changed.connect(self._add_changed)
         grid.addWidget(self._load_options, 4, 0, 1, 2)
 
@@ -462,11 +463,14 @@ class AtlasDescription(QtGui.QGroupBox):
         grid.addLayout(hbox, 5, 0, 1, 2)
         self._add_changed()
 
+    def _name_to_dataset_name(self, name):
+        return name.replace(" ", "_").replace("-", "_").replace(",", "").replace("(", "").replace(")", "").lower()
+
     def set_atlas(self, atlas_desc):
         self._desc = atlas_desc
         self._name.setText(atlas_desc.name)
         self._type.setText(atlas_desc.atlasType)
-        self._load_options.option("name").value = atlas_desc.name.replace(" ", "_").replace("-", "_").lower()
+        self._load_options.option("name").value = self._name_to_dataset_name(atlas_desc.name)
         
         self._imgs.clear()
         for pixdim in atlas_desc.pixdims:
@@ -482,6 +486,13 @@ class AtlasDescription(QtGui.QGroupBox):
             self._label_model.appendRow([index_item, name_item])
         self._label_table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.ResizeToContents)
         self._label_table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
+        self._load_regions_changed()
+
+    def _load_regions_changed(self):
+        if self._load_options.values()["regions"] == "sel":
+            self._region_changed()
+        else:
+            self._load_options.option("name").value = self._name_to_dataset_name(self._desc.name)
 
     def _region_changed(self):
         if self._load_options.values()["regions"] == "sel":
@@ -489,8 +500,7 @@ class AtlasDescription(QtGui.QGroupBox):
             if indexes:
                 region_name = self._label_model.item(indexes[0].row(), 1).text()
                 if region_name:
-                    load_name = region_name.replace(" ", "_").replace("-", "_").replace(",", "").replace("(", "").replace(")", "").lower()
-                    self._load_options.option("name").value = load_name
+                    self._load_options.option("name").value = self._name_to_dataset_name(region_name)
 
     def _add_changed(self):
         add = self._load_options.values()["add"] == "add"

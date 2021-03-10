@@ -486,7 +486,7 @@ class AtlasDescription(QtGui.QGroupBox):
             self._label_model.appendRow([index_item, name_item])
         self._label_table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.ResizeToContents)
         self._label_table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
-        self._load_regions_changed()
+        self._load_options.option("regions").value = "all"
 
     def _load_regions_changed(self):
         if self._load_options.values()["regions"] == "sel":
@@ -535,7 +535,7 @@ class AtlasDescription(QtGui.QGroupBox):
                     raise QpException("Can't add data to existing data set - it is not an ROI")
                 new_data = NumpyData(orig_data.raw() + new_data.raw(), grid=new_data.grid, name=add_name, roi=is_roi)
 
-            self.ivm.add(new_data)
+            self.ivm.add(new_data, make_current=True)
 
 class AtlasListWidget(QtGui.QTableView):
     """

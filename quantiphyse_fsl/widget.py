@@ -522,7 +522,7 @@ class AtlasDescription(QtGui.QGroupBox):
             if not load_all:
                 indexes = self._label_table.selectionModel().selectedRows()
                 vol = int(self._label_model.item(indexes[0].row(), 0).text())
-            new_data = fslimage_to_qpdata(atlas, vol=vol, name=new_name)
+            new_data = fslimage_to_qpdata(atlas, vol=vol, name=new_name, roi=is_roi)
 
             if add and add_name in self.ivm.data:
                 # User wants to add the region to an existing data set
@@ -533,9 +533,9 @@ class AtlasDescription(QtGui.QGroupBox):
                     raise QpException("Can't add data to existing data set - grids do not match")
                 if is_roi and not orig_data.roi:
                     raise QpException("Can't add data to existing data set - it is not an ROI")
-                new_data = NumpyData(orig_data.raw() + new_data.raw(), grid=new_data.grid, name=add_name)
-                
-            self.ivm.add(new_data, roi=is_roi)
+                new_data = NumpyData(orig_data.raw() + new_data.raw(), grid=new_data.grid, name=add_name, roi=is_roi)
+
+            self.ivm.add(new_data)
 
 class AtlasListWidget(QtGui.QTableView):
     """

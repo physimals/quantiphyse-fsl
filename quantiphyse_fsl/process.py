@@ -38,7 +38,7 @@ def qpdata_to_fslimage(qpd):
     from fsl.data.image import Image
     return Image(qpd.raw(), name=qpd.name, xform=qpd.grid.affine)
 
-def fslimage_to_qpdata(img, name=None, vol=None, region=None):
+def fslimage_to_qpdata(img, name=None, vol=None, region=None, roi=False):
     """ Convert fsl.data.Image to QpData """
     if not name: name = img.name
     if vol is not None:
@@ -47,7 +47,7 @@ def fslimage_to_qpdata(img, name=None, vol=None, region=None):
         data = img.data
     if region is not None:
         data = (data == region).astype(np.int)
-    return NumpyData(data, grid=DataGrid(img.shape[:3], img.voxToWorldMat), name=name)
+    return NumpyData(data, grid=DataGrid(img.shape[:3], img.voxToWorldMat), name=name, roi=roi)
 
 def _run_fsl(worker_id, queue, fsldir, fsldevdir, cmd, cmd_args):
     """

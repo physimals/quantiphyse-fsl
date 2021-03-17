@@ -383,6 +383,7 @@ class FslAtlasWidget(QpWidget):
 
     def init_ui(self):  
         vbox = QtGui.QVBoxLayout()
+        vbox.setSpacing(1)
         self.setLayout(vbox)
 
         vbox.addWidget(TitleWidget(self))
@@ -403,7 +404,7 @@ class FslAtlasWidget(QpWidget):
         self._registry.rescanAtlases()
         self.atlas_list.init_list()
 
-class AtlasDescription(QtGui.QGroupBox):
+class AtlasDescription(QtGui.QWidget):
     """
     Displays atlas description
     """
@@ -440,8 +441,11 @@ class AtlasDescription(QtGui.QGroupBox):
         self._label_table.setShowGrid(False)
         self._label_table.setTextElideMode(QtCore.Qt.ElideLeft)
         self._label_table.setAlternatingRowColors(True)
+        self._label_table.ensurePolished()
+        fm = QtGui.QFontMetrics(self._label_table.font())
         self._label_table.verticalHeader().setVisible(False)
-        self._label_table.verticalHeader().setDefaultSectionSize(self._label_table.verticalHeader().minimumSectionSize()+2)
+        self._label_table.verticalHeader().setSectionResizeMode(QtGui.QHeaderView.Fixed)
+        self._label_table.verticalHeader().setDefaultSectionSize(fm.height()+2)
 
         grid.addWidget(self._label_table, 3, 0, 1, 2)
         grid.setRowStretch(3, 1)
@@ -545,12 +549,15 @@ class AtlasListWidget(QtGui.QTableView):
 
     def __init__(self, parent, registry):
         super(AtlasListWidget, self).__init__(parent)
-        self.setStyleSheet("font-size: 10px; alternate-background-color: #6c6c6c;")
+        self.setStyleSheet("QTableView { font-size: 10px; alternate-background-color: #6c6c6c; } QTableView::item { height: 5px; }")
         self.setShowGrid(False)
         self.setTextElideMode(QtCore.Qt.ElideLeft)
         self.setAlternatingRowColors(True)
         self.verticalHeader().setVisible(False)
-        self.verticalHeader().setDefaultSectionSize(self.verticalHeader().minimumSectionSize()+2)
+        self.ensurePolished()
+        fm = QtGui.QFontMetrics(self.font())
+        self.verticalHeader().setSectionResizeMode(QtGui.QHeaderView.Fixed)
+        self.verticalHeader().setDefaultSectionSize(fm.height()+2)
 
         self._registry = registry
         self._atlases = {}
@@ -638,6 +645,11 @@ class FslDataListWidget(QtGui.QTableView):
         self.setAlternatingRowColors(True)
         self.verticalHeader().setVisible(False)
         self.verticalHeader().setDefaultSectionSize(self.verticalHeader().minimumSectionSize()+2)
+        self.ensurePolished()
+        fm = QtGui.QFontMetrics(self.font())
+        self.verticalHeader().setVisible(False)
+        self.verticalHeader().setSectionResizeMode(QtGui.QHeaderView.Fixed)
+        self.verticalHeader().setDefaultSectionSize(fm.height()+2)
         self._init_list()
 
         self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)

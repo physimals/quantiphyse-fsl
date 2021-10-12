@@ -18,10 +18,7 @@ limitations under the License.
 import os
 import six
 
-try:
-    from PySide import QtGui, QtCore, QtGui as QtWidgets
-except ImportError:
-    from PySide2 import QtGui, QtCore, QtWidgets
+from PySide2 import QtGui, QtCore, QtWidgets
 
 from quantiphyse.data import QpData, DataGrid, NumpyData
 from quantiphyse.gui.widgets import Citation
@@ -178,8 +175,8 @@ class FlirtRegMethod(RegMethod):
             generic_options = {}
             
         if self.options_widget is None:    
-            self.options_widget = QtGui.QWidget()  
-            vbox = QtGui.QVBoxLayout()
+            self.options_widget = QtWidgets.QWidget()  
+            vbox = QtWidgets.QVBoxLayout()
             self.options_widget.setLayout(vbox)
 
             cite = Citation(CITE_TITLE, CITE_AUTHOR, CITE_JOURNAL)

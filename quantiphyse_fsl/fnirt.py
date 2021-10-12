@@ -17,10 +17,7 @@ limitations under the License.
 """
 import six
 
-try:
-    from PySide import QtGui, QtCore, QtGui as QtWidgets
-except ImportError:
-    from PySide2 import QtGui, QtCore, QtWidgets
+from PySide2 import QtGui, QtCore, QtWidgets
 
 from quantiphyse.gui.widgets import Citation
 from quantiphyse.gui.options import OptionBox, DataOption, ChoiceOption
@@ -113,8 +110,8 @@ class FnirtRegMethod(RegMethod):
             generic_options = {}
 
         if self.options_widget is None:    
-            self.options_widget = QtGui.QWidget()  
-            vbox = QtGui.QVBoxLayout()
+            self.options_widget = QtWidgets.QWidget()  
+            vbox = QtWidgets.QVBoxLayout()
             self.options_widget.setLayout(vbox)
 
             cite = Citation(CITE_TITLE, CITE_AUTHOR, CITE_JOURNAL)

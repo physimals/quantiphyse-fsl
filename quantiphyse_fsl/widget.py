@@ -22,10 +22,7 @@ import sys
 import os
 import glob
 
-try:
-    from PySide import QtGui, QtCore, QtGui as QtWidgets
-except ImportError:
-    from PySide2 import QtGui, QtCore, QtWidgets
+from PySide2 import QtGui, QtCore, QtWidgets
 
 from fsl.data.atlases import AtlasRegistry
 
@@ -57,34 +54,34 @@ CITATIONS = {
     ),
 }
 
-class FslDirWidget(QtGui.QFrame):
+class FslDirWidget(QtWidgets.QFrame):
     """
     Widget which reports current FSLDIR and allows it to be changed
     """
     sig_changed = QtCore.Signal(str)
 
     def __init__(self, **kwargs):
-        QtGui.QFrame.__init__(self, **kwargs)
+        QtWidgets.QFrame.__init__(self, **kwargs)
         self.setStyleSheet("QWidget { background-color: #609050; color: black; border-radius: 5;}")
         self._settings = QtCore.QSettings()
 
-        hbox = QtGui.QHBoxLayout()
+        hbox = QtWidgets.QHBoxLayout()
         self.setLayout(hbox)
-        icon = QtGui.QLabel()
-        info_icon = icon.style().standardIcon(QtGui.QStyle.SP_MessageBoxInformation)
+        icon = QtWidgets.QLabel()
+        info_icon = icon.style().standardIcon(QtWidgets.QStyle.SP_MessageBoxInformation)
         icon.setPixmap(info_icon.pixmap(32, 32))
         hbox.addWidget(icon)
-        lbl = QtGui.QLabel("Using FSL in")
+        lbl = QtWidgets.QLabel("Using FSL in")
         hbox.addWidget(lbl)
         hbox.setAlignment(lbl, QtCore.Qt.AlignTop) # Because the elided label always goes to the top...
-        vbox = QtGui.QVBoxLayout() 
+        vbox = QtWidgets.QVBoxLayout() 
         self._fsldir_label = ElidedLabel()
         vbox.addWidget(self._fsldir_label)
         self._fsldevdir_label = ElidedLabel()
         vbox.addWidget(self._fsldevdir_label)
         hbox.addLayout(vbox)
 
-        btn = QtGui.QPushButton("Change")
+        btn = QtWidgets.QPushButton("Change")
         btn.clicked.connect(self._change_fsldir)
         hbox.addWidget(btn)
         self._update_label()
@@ -180,7 +177,7 @@ class FslDirWidget(QtGui.QFrame):
     def _possible_fsldir(self, folder):
         return os.path.isfile(os.path.join(folder, "bin", "flirt"))
 
-class FslDirDialog(QtGui.QDialog):
+class FslDirDialog(QtWidgets.QDialog):
     """
     Dialog box to choose FSLDIR
     """
@@ -188,7 +185,7 @@ class FslDirDialog(QtGui.QDialog):
     def __init__(self, fsldir, fsldevdir):
         super(FslDirDialog, self).__init__(quantiphyse.gui.dialogs.MAINWIN)
         self.setWindowTitle("Choose location of FSL installation")
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
 
         self.optbox = OptionBox()
         self.optbox.add("FSL installation", FileOption(dirs=True, initial=fsldir), key="fsldir")
@@ -197,9 +194,9 @@ class FslDirDialog(QtGui.QDialog):
         self.optbox.option("fsldevdir").sig_changed.connect(self._fsldevdir_changed)
         vbox.addWidget(self.optbox)
         
-        hbox = QtGui.QHBoxLayout()
+        hbox = QtWidgets.QHBoxLayout()
         hbox.addStretch(1)
-        self.button_box = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+        self.button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         hbox.addWidget(self.button_box)
@@ -249,7 +246,7 @@ class FslWidget(QpWidget):
         self.prog = kwargs["prog"]
         
     def init_ui(self, run_box=True):
-        self.vbox = QtGui.QVBoxLayout()
+        self.vbox = QtWidgets.QVBoxLayout()
         self.setLayout(self.vbox)
         
         title = TitleWidget(self, help="fsl", subtitle="%s %s" % (self.description, __version__))
@@ -358,11 +355,11 @@ class FslMathsWidget(FslWidget):
     
     def init_ui(self):
         FslWidget.init_ui(self, run_box=False)
-        run_btn = QtGui.QPushButton("Run")
+        run_btn = QtWidgets.QPushButton("Run")
         run_btn.clicked.connect(self._run)
         self.options.add("Command string", TextOption(), run_btn, key="cmd")
 
-        doc = QtGui.QLabel("Enter the fslmaths command line string as you would normally. Use the names of the Quantiphyse data sets you want to use as filenames")
+        doc = QtWidgets.QLabel("Enter the fslmaths command line string as you would normally. Use the names of the Quantiphyse data sets you want to use as filenames")
         doc.setWordWrap(True)
         self.vbox.insertWidget(self.vbox.count()-1, doc)
 
@@ -382,7 +379,7 @@ class FslAtlasWidget(QpWidget):
         self._registry = AtlasRegistry()
 
     def init_ui(self):  
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         vbox.setSpacing(1)
         self.setLayout(vbox)
 
@@ -404,7 +401,7 @@ class FslAtlasWidget(QpWidget):
         self._registry.rescanAtlases()
         self.atlas_list.init_list()
 
-class AtlasDescription(QtGui.QWidget):
+class AtlasDescription(QtWidgets.QWidget):
     """
     Displays atlas description
     """
@@ -416,25 +413,25 @@ class AtlasDescription(QtGui.QWidget):
         self._registry = registry
         self.ivm = parent.ivm
         self._desc = None
-        grid = QtGui.QGridLayout()
+        grid = QtWidgets.QGridLayout()
         self.setLayout(grid)
 
-        grid.addWidget(QtGui.QLabel("Name"), 0, 0)
-        self._name = QtGui.QLabel()
+        grid.addWidget(QtWidgets.QLabel("Name"), 0, 0)
+        self._name = QtWidgets.QLabel()
         grid.addWidget(self._name, 0, 1)
-        grid.addWidget(QtGui.QLabel("Type"), 1, 0)
-        self._type = QtGui.QLabel()
+        grid.addWidget(QtWidgets.QLabel("Type"), 1, 0)
+        self._type = QtWidgets.QLabel()
         grid.addWidget(self._type, 1, 1)
-        grid.addWidget(QtGui.QLabel("Resolutions"), 2, 0)
-        self._imgs = QtGui.QComboBox()
+        grid.addWidget(QtWidgets.QLabel("Resolutions"), 2, 0)
+        self._imgs = QtWidgets.QComboBox()
         grid.addWidget(self._imgs, 2, 1)
 
-        self._label_table = QtGui.QTableView()
+        self._label_table = QtWidgets.QTableView()
         self._label_model = QtGui.QStandardItemModel()
         self._label_table.setModel(self._label_model)
-        self._label_table.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-        self._label_table.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
-        self._label_table.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        self._label_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self._label_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self._label_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._label_table.selectionModel().selectionChanged.connect(self._region_changed)
 
         self._label_table.setStyleSheet("font-size: 10px; alternate-background-color: #6c6c6c;")
@@ -444,7 +441,7 @@ class AtlasDescription(QtGui.QWidget):
         self._label_table.ensurePolished()
         fm = QtGui.QFontMetrics(self._label_table.font())
         self._label_table.verticalHeader().setVisible(False)
-        self._label_table.verticalHeader().setSectionResizeMode(QtGui.QHeaderView.Fixed)
+        self._label_table.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
         self._label_table.verticalHeader().setDefaultSectionSize(fm.height()+2)
 
         grid.addWidget(self._label_table, 3, 0, 1, 2)
@@ -459,8 +456,8 @@ class AtlasDescription(QtGui.QWidget):
         self._load_options.option("add").sig_changed.connect(self._add_changed)
         grid.addWidget(self._load_options, 4, 0, 1, 2)
 
-        hbox = QtGui.QHBoxLayout()
-        btn = QtGui.QPushButton("Load")
+        hbox = QtWidgets.QHBoxLayout()
+        btn = QtWidgets.QPushButton("Load")
         btn.clicked.connect(self._load)
         hbox.addWidget(btn)
         hbox.addStretch(1)
@@ -488,8 +485,8 @@ class AtlasDescription(QtGui.QWidget):
             index_item = QtGui.QStandardItem("%i" % label.index)
             name_item = QtGui.QStandardItem(label.name)
             self._label_model.appendRow([index_item, name_item])
-        self._label_table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.ResizeToContents)
-        self._label_table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
+        self._label_table.horizontalHeader().setResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+        self._label_table.horizontalHeader().setResizeMode(1, QtWidgets.QHeaderView.Stretch)
         self._load_options.option("regions").value = "all"
 
     def _load_regions_changed(self):
@@ -541,7 +538,7 @@ class AtlasDescription(QtGui.QWidget):
 
             self.ivm.add(new_data, make_current=True)
 
-class AtlasListWidget(QtGui.QTableView):
+class AtlasListWidget(QtWidgets.QTableView):
     """
     Table showing available atlases
     """
@@ -556,16 +553,16 @@ class AtlasListWidget(QtGui.QTableView):
         self.verticalHeader().setVisible(False)
         self.ensurePolished()
         fm = QtGui.QFontMetrics(self.font())
-        self.verticalHeader().setSectionResizeMode(QtGui.QHeaderView.Fixed)
+        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
         self.verticalHeader().setDefaultSectionSize(fm.height()+2)
 
         self._registry = registry
         self._atlases = {}
         self.init_list()
 
-        self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-        self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
-        self.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.clicked.connect(self._clicked)
 
     def init_list(self):
@@ -576,8 +573,8 @@ class AtlasListWidget(QtGui.QTableView):
             self.model.appendRow([QtGui.QStandardItem(s) for s in (atlas.name, atlas.atlasType)])
             self._atlases[atlas.name] = atlas
         self.setModel(self.model)
-        self.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
-        self.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.ResizeToContents)
+        self.horizontalHeader().setResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        self.horizontalHeader().setResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
 
     def _clicked(self, idx):
         row = idx.row()
@@ -595,7 +592,7 @@ class FslDataWidget(QpWidget):
         self._selected = None
 
     def init_ui(self):  
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         self.setLayout(vbox)
 
         vbox.addWidget(TitleWidget(self))
@@ -605,12 +602,12 @@ class FslDataWidget(QpWidget):
         vbox.addWidget(self.data_list)
         self.data_list.sig_selected.connect(self._data_selected)
         
-        hbox = QtGui.QHBoxLayout()
-        self._load_btn = QtGui.QPushButton("Load")
+        hbox = QtWidgets.QHBoxLayout()
+        self._load_btn = QtWidgets.QPushButton("Load")
         self._load_btn.clicked.connect(self._load)
         hbox.addWidget(self._load_btn)
-        hbox.addWidget(QtGui.QLabel("Dataset name: "))
-        self._load_name = QtGui.QLineEdit()
+        hbox.addWidget(QtWidgets.QLabel("Dataset name: "))
+        self._load_name = QtWidgets.QLineEdit()
         hbox.addWidget(self._load_name)
         vbox.addLayout(hbox)
 
@@ -630,7 +627,7 @@ class FslDataWidget(QpWidget):
             qpdata.roi = roi
             self.ivm.add(qpdata, name=self._load_name.text())
 
-class FslDataListWidget(QtGui.QTableView):
+class FslDataListWidget(QtWidgets.QTableView):
     """
     Table showing standard FSL data sets
     """
@@ -648,13 +645,13 @@ class FslDataListWidget(QtGui.QTableView):
         self.ensurePolished()
         fm = QtGui.QFontMetrics(self.font())
         self.verticalHeader().setVisible(False)
-        self.verticalHeader().setSectionResizeMode(QtGui.QHeaderView.Fixed)
+        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
         self.verticalHeader().setDefaultSectionSize(fm.height()+2)
         self._init_list()
 
-        self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-        self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
-        self.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.clicked.connect(self._clicked)
 
     def _init_list(self):
@@ -665,7 +662,7 @@ class FslDataListWidget(QtGui.QTableView):
             if os.path.isfile(fname):
                 self.model.appendRow([QtGui.QStandardItem(os.path.basename(fname))])
         self.setModel(self.model)
-        self.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
+        self.horizontalHeader().setResizeMode(0, QtWidgets.QHeaderView.Stretch)
 
     def _clicked(self, idx):
         row = idx.row()

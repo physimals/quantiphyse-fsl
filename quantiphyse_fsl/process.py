@@ -46,7 +46,7 @@ def fslimage_to_qpdata(img, name=None, vol=None, region=None, roi=False):
     else:
         data = img.data
     if region is not None:
-        data = (data == region).astype(np.int)
+        data = (data == region).astype(np.int32)
     return NumpyData(data, grid=DataGrid(img.shape[:3], img.voxToWorldMat), name=name, roi=roi)
 
 def _run_fsl(worker_id, queue, fsldir, fsldevdir, cmd, cmd_args):

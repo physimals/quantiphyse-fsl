@@ -485,8 +485,8 @@ class AtlasDescription(QtWidgets.QWidget):
             index_item = QtGui.QStandardItem("%i" % label.index)
             name_item = QtGui.QStandardItem(label.name)
             self._label_model.appendRow([index_item, name_item])
-        self._label_table.horizontalHeader().setResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
-        self._label_table.horizontalHeader().setResizeMode(1, QtWidgets.QHeaderView.Stretch)
+        self._label_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+        self._label_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
         self._load_options.option("regions").value = "all"
 
     def _load_regions_changed(self):
@@ -573,8 +573,8 @@ class AtlasListWidget(QtWidgets.QTableView):
             self.model.appendRow([QtGui.QStandardItem(s) for s in (atlas.name, atlas.atlasType)])
             self._atlases[atlas.name] = atlas
         self.setModel(self.model)
-        self.horizontalHeader().setResizeMode(0, QtWidgets.QHeaderView.Stretch)
-        self.horizontalHeader().setResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
 
     def _clicked(self, idx):
         row = idx.row()
@@ -662,7 +662,7 @@ class FslDataListWidget(QtWidgets.QTableView):
             if os.path.isfile(fname):
                 self.model.appendRow([QtGui.QStandardItem(os.path.basename(fname))])
         self.setModel(self.model)
-        self.horizontalHeader().setResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
 
     def _clicked(self, idx):
         row = idx.row()
